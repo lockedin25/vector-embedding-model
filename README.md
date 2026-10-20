@@ -1,6 +1,14 @@
-# Vector Embedding Model & 3D Transformation Studio
+# Vector Embedding Model & 3D Transformation Instrument
 
-Interactive 2560-dimensional semantic embedding engine and 3D Three.js visualization studio powered by **Qwen/Qwen3-Embedding-4B** on Apple Silicon (`mps`), CUDA, or CPU.
+Interactive 2560-dimensional semantic embedding engine and 3D Three.js projection instrument powered by **Qwen/Qwen3-Embedding-4B** on Apple Silicon (`mps`), CUDA, or CPU.
+
+## Learning Objectives
+
+- **High-Dimensional Representation**: Understand how transformer embedding models map discrete words and phrases onto the unit hypersphere in $\mathbb{R}^{2560}$.
+- **Linear Semantic Structure**: Observe how relational directions (gender, royalty, geography, tense) emerge as linear displacement vectors $\Delta = \vec{v}_{\text{target}} - \vec{v}_{\text{source}}$.
+- **Analogical Reasoning via Vector Arithmetic**: Compute transformations $\vec{v}_{\text{result}} = \text{normalize}(\vec{v}_{\text{base}} + \Delta)$ (e.g., `uncle + (woman - man) -> aunt`) and measure cosine similarity ($\cos \theta$) and angular distance ($\theta^\circ$).
+- **Fast Vector Retrieval**: Implement sub-millisecond nearest-neighbor search over a cached vocabulary matrix via BLAS dot products ($\mathbf{M}_{\text{vocab}} \cdot \vec{v}_q$).
+- **Dimensionality Reduction & Fidelity**: Project $\mathbb{R}^{2560}$ vectors into $\mathbb{R}^3$ using Principal Component Analysis (PCA) while tracking explained variance across principal axes (`PC1`, `PC2`, `PC3`).
 
 ## Features
 
@@ -13,26 +21,27 @@ Interactive 2560-dimensional semantic embedding engine and 3D Three.js visualiza
 4. **Sub-Millisecond Vocabulary Nearest-Neighbor Search** ([`vocab_manager.py`](./vocab_manager.py)):
    - Pre-indexes 2,500 curated benchmark and common English words in `vocab_cache.npz` for `< 1.5 ms` BLAS dot-product lookup.
    - Dynamically indexes any custom word entered during a session.
-5. **Interactive 3D Web Studio** ([`server.py`](./server.py), [`static/index.html`](./static/index.html)):
-   - **Expression Tab**: Plot individual words or arbitrary vector formulas.
-   - **Transformation Tab**: Dedicated `Base`, `Target (+)`, and `Source (-)` studio with benchmark presets and toggles for component vectors and input filtering.
-   - **Compare Tab**: Compute exact 2560-dim pairwise cosine similarity between any two concepts and link them in 3D.
-   - **3D Scene Controls**: PCA projection (`2560-dim -> 3D`), orbit/pan/zoom camera, click-to-focus raycasting, individual vector removal, and session state persistence across refreshes.
+5. **Precision 3D Web Instrument** ([`server.py`](./server.py), [`static/index.html`](./static/index.html)):
+   - **01 EXPR**: Plot individual concepts or arbitrary linear combinations.
+   - **02 TRANSFORM**: Dedicated `Base (v₀)`, `Target (+)`, and `Source (−)` workbench with 1-click axis inversion (`Swap ↔`), benchmark presets, and basis vector toggles.
+   - **03 COMPARE & Matrix (`[M]`)**: Measure exact $\mathbb{R}^{2560}$ pairwise cosine similarity and angular separation ($\theta^\circ$), or open the full $N \times N$ similarity heatmap modal.
+   - **Zero-Idle WebGL Engine**: Demand-driven render loop (`0% GPU` when stationary), explicit WebGL geometry/material disposal, and live 3D PCA explained-variance telemetry.
 
 ## Quickstart
 
-### 1. Activate Environment & Install Dependencies
+### 1. Create Environment & Install Dependencies
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Launch the 3D Web Visualizer
+### 2. Launch the 3D Web Instrument
 ```bash
 .venv/bin/python server.py
 ```
 Open **[http://127.0.0.1:5050](http://127.0.0.1:5050)** in your browser.
+*(Note: First run downloads ~7.5 GB of `Qwen/Qwen3-Embedding-4B` weights into `./models/` and builds `vocab_cache.npz`.)*
 
 ### 3. CLI Usage
 ```bash
