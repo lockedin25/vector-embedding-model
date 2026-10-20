@@ -83,6 +83,10 @@ class TestVectorEmbeddingModel(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         trans_data = res.get_json()
         self.assertIn(trans_data["transformation"]["closest_word"], {"aunt", "auntie"})
+        self.assertIsNotNone(trans_data.get("explained_variance"))
+        self.assertEqual(len(trans_data["explained_variance"]), 3)
+        self.assertIn("similarity_matrix", trans_data)
+        self.assertGreaterEqual(len(trans_data["similarity_matrix"]["words"]), 6)
 
         # Similarity endpoint
         res = client.post("/api/similarity", json={"word_a": "king", "word_b": "queen"})

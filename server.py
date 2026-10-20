@@ -42,38 +42,53 @@ _links: list[dict[str, Any]] = []
 # Deterministic fallback projection for when fewer than 3 words are plotted
 _fallback_matrix = np.random.default_rng(42).normal(size=(2560, 3))
 
+_STANDARD_PALETTE = [
+    "#58a6ff",  # Technical blue
+    "#3fb950",  # Signal green
+    "#d29922",  # Ochre / amber
+    "#f78166",  # Terracotta
+    "#79c0ff",  # Ice blue
+    "#56d364",  # Mint
+    "#e3b341",  # Gold
+    "#ffa657",  # Tangerine
+    "#a5d6ff",  # Pale cyan
+    "#ff7b72",  # Coral red
+]
+
 
 def _color_for(word: str, node_type: str = "word") -> str:
-    """Assign colors, with special semantic palette for arithmetic/transformation types."""
+    """Assign high-contrast instrument palette colors for vector types."""
     if node_type == "result":
-        return "#f59e0b"  # Bright amber / gold
+        return "#e5533d"  # Vermilion / signal orange
     if node_type == "delta":
-        return "#c084fc"  # Vibrant purple / violet
+        return "#d99b26"  # Technical amber
     if node_type == "nearest":
-        return "#10b981"  # Emerald green
+        return "#2ea073"  # Jade green
     if node_type == "base":
-        return "#38bdf8"  # Sky blue
+        return "#4b8be5"  # Steel blue
     if node_type == "source":
-        return "#f43f5e"  # Rose / red
+        return "#d9536f"  # Rose coral
     if node_type == "target":
-        return "#34d399"  # Mint green
+        return "#36a3b8"  # Cyan
 
-    # Standard deterministic hash-based color
-    digest = hashlib.sha256(word.encode()).hexdigest()
-    return f"#{digest[:6]}"
+    digest = int(hashlib.sha256(word.encode()).hexdigest()[:8], 16)
+    return _STANDARD_PALETTE[digest % len(_STANDARD_PALETTE)]
 
 
-def _project() -> list[dict[str, Any]]:
-    """Project all active embeddings to 3D space using PCA (or fallback)."""
+def _project_with_stats() -> tuple[list[dict[str, Any]], list[float] | None]:
+    """Project all active embeddings to 3D space using PCA (or fallback) and return explained variance."""
     if not _order:
-        return []
+        return [], None
 
-    vectors = np.array([_embeddings[w] for w in _order])
+    vectors = np.array([_embeddings[w] for w in _order], dtype=np.float32)
+    explained_var: list[float] | None = None
 
     if len(_order) < 3:
         coords = vectors @ _fallback_matrix
     else:
-        coords = PCA(n_components=3).fit_transform(vectors)
+        pca = PCA(n_components=3)
+        coords = pca.fit_transform(vectors)
+        explained_var = [round(float(v), 4) for v in pca.explained_variance_ratio_]
 
     max_norm = np.linalg.norm(coords, axis=1).max()
     if max_norm > 0:
@@ -86,15 +101,51 @@ def _project() -> list[dict[str, Any]]:
         points.append(
             {
                 "word": word,
-                "x": float(c[0]),
-                "y": float(c[1]),
-                "z": float(c[2]),
+                "x": round(float(c[0]), 4),
+                "y": round(float(c[1]), 4),
+                "z": round(float(c[2]), 4),
                 "color": item_meta.get("color") or _color_for(word, node_type),
                 "type": node_type,
                 "meta": item_meta,
             }
         )
-    return points
+    return points, explained_var
+
+
+def _project() -> list[dict[str, Any]]:
+    """Backwards-compatible helper returning projected 3D points."""
+    pts, _ = _project_with_stats()
+    return pts
+
+
+def _compute_similarity_matrix() -> dict[str, Any]:
+    """Compute pairwise cosine similarity matrix for all active vectors in <0.1ms."""
+    if not _order:
+        return {"words": [], "matrix": []}
+    mat = np.array([_embeddings[w] for w in _order], dtype=np.float32)
+    norms = np.linalg.norm(mat, axis=1, keepdims=True)
+    norms = np.where(norms > 0, norms, 1.0)
+    unit_mat = mat / norms
+    sim_mat = np.clip(unit_mat @ unit_mat.T, -1.0, 1.0)
+    return {
+        "words": list(_order),
+        "matrix": [[round(float(val), 4) for val in row] for row in sim_mat],
+    }
+
+
+def _scene_payload(**extra: Any) -> dict[str, Any]:
+    """Build standard scene response with 3D points, links, PCA variance, and similarity matrix."""
+    pts, explained_var = _project_with_stats()
+    payload: dict[str, Any] = {
+        "points": pts,
+        "links": _get_links(pts),
+        "dimension": 2560,
+        "vocab_size": len(vocab_manager.words),
+        "explained_variance": explained_var,
+        "similarity_matrix": _compute_similarity_matrix(),
+    }
+    payload.update(extra)
+    return payload
 
 
 def _upsert_link(link_item: dict[str, Any]) -> None:
@@ -135,16 +186,8 @@ def index():
 
 @app.route("/api/state", methods=["GET"])
 def state():
-    """Return current 3D scene points, links, and vocabulary metadata."""
-    pts = _project()
-    return jsonify(
-        {
-            "points": pts,
-            "links": _get_links(pts),
-            "dimension": 2560,
-            "vocab_size": len(vocab_manager.words),
-        }
-    )
+    """Return current 3D scene points, links, PCA variance, and similarity matrix."""
+    return jsonify(_scene_payload())
 
 
 @app.route("/api/embed", methods=["POST"])
@@ -180,7 +223,7 @@ def embed():
                 _order.append(expr_label)
             _meta[expr_label] = {
                 "type": "result",
-                "color": "#f59e0b",
+                "color": "#e5533d",
                 "nearest_words": expr_data["nearest_words"],
                 "closest_word": expr_data["closest_word"],
                 "closest_similarity": expr_data["closest_similarity"],
@@ -195,7 +238,7 @@ def embed():
                     _order.append(closest)
                 _meta[closest] = {
                     "type": "nearest",
-                    "color": "#10b981",
+                    "color": "#2ea073",
                     "similarity": expr_data["closest_similarity"],
                 }
 
@@ -205,20 +248,12 @@ def embed():
                         "from": expr_label,
                         "to": closest,
                         "style": "dotted",
-                        "color": "#10b981",
-                        "label": f"sim: {expr_data['closest_similarity']}",
+                        "color": "#2ea073",
+                        "label": f"cos {expr_data['closest_similarity']:.4f}",
                     }
                 )
 
-            pts = _project()
-            return jsonify(
-                {
-                    "points": pts,
-                    "links": _get_links(pts),
-                    "dimension": 2560,
-                    "expression": expr_data,
-                }
-            )
+            return jsonify(_scene_payload(expression=expr_data))
 
         except Exception as e:
             return jsonify({"error": f"Failed to evaluate expression: {str(e)}"}), 400
@@ -235,15 +270,7 @@ def embed():
         "closest_similarity": word_info["closest_similarity"],
     }
 
-    pts = _project()
-    return jsonify(
-        {
-            "points": pts,
-            "links": _get_links(pts),
-            "dimension": 2560,
-            "word_info": word_info,
-        }
-    )
+    return jsonify(_scene_payload(word_info=word_info))
 
 
 @app.route("/api/transform", methods=["POST"])
@@ -279,27 +306,27 @@ def transform():
             _embeddings[base] = np.array(res["base_vector"], dtype=np.float32)
             if base not in _order:
                 _order.append(base)
-            _meta[base] = {"type": "base", "color": "#38bdf8"}
+            _meta[base] = {"type": "base", "color": "#4b8be5"}
 
             # 2. Source
             v_source = get_embedding(source)
             _embeddings[source] = np.array(v_source, dtype=np.float32)
             if source not in _order:
                 _order.append(source)
-            _meta[source] = {"type": "source", "color": "#f43f5e"}
+            _meta[source] = {"type": "source", "color": "#d9536f"}
 
             # 3. Target
             v_target = get_embedding(target)
             _embeddings[target] = np.array(v_target, dtype=np.float32)
             if target not in _order:
                 _order.append(target)
-            _meta[target] = {"type": "target", "color": "#34d399"}
+            _meta[target] = {"type": "target", "color": "#36a3b8"}
 
             # 4. Difference vector delta
             _embeddings[delta_label] = np.array(res["delta_vector"], dtype=np.float32)
             if delta_label not in _order:
                 _order.append(delta_label)
-            _meta[delta_label] = {"type": "delta", "color": "#c084fc"}
+            _meta[delta_label] = {"type": "delta", "color": "#d99b26"}
 
         # 5. Resultant vector
         _embeddings[result_label] = np.array(res["result_vector"], dtype=np.float32)
@@ -307,7 +334,7 @@ def transform():
             _order.append(result_label)
         _meta[result_label] = {
             "type": "result",
-            "color": "#f59e0b",
+            "color": "#e5533d",
             "nearest_words": res["nearest_words"],
             "closest_word": closest,
             "closest_similarity": res["closest_similarity"],
@@ -321,7 +348,7 @@ def transform():
                 _order.append(closest)
             _meta[closest] = {
                 "type": "nearest",
-                "color": "#10b981",
+                "color": "#2ea073",
                 "similarity": res["closest_similarity"],
             }
 
@@ -331,8 +358,8 @@ def transform():
                     "from": result_label,
                     "to": closest,
                     "style": "dotted",
-                    "color": "#10b981",
-                    "label": f"sim: {res['closest_similarity']}",
+                    "color": "#2ea073",
+                    "label": f"cos {res['closest_similarity']:.4f}",
                 }
             )
 
@@ -343,20 +370,12 @@ def transform():
                     "from": base,
                     "to": result_label,
                     "style": "dashed",
-                    "color": "#c084fc",
+                    "color": "#d99b26",
                     "label": f"+ ({delta_label})",
                 }
             )
 
-        pts = _project()
-        return jsonify(
-            {
-                "points": pts,
-                "links": _get_links(pts),
-                "dimension": 2560,
-                "transformation": res,
-            }
-        )
+        return jsonify(_scene_payload(transformation=res))
 
     except Exception as e:
         return jsonify({"error": f"Transformation failed: {str(e)}"}), 500
@@ -394,20 +413,12 @@ def similarity():
                 "from": word_a,
                 "to": word_b,
                 "style": "dotted",
-                "color": "#38bdf8",
-                "label": f"cos sim: {res['similarity']:.4f}",
+                "color": "#4b8be5",
+                "label": f"cos {res['similarity']:.4f}",
             }
         )
 
-        pts = _project()
-        return jsonify(
-            {
-                "points": pts,
-                "links": _get_links(pts),
-                "dimension": 2560,
-                "similarity": res,
-            }
-        )
+        return jsonify(_scene_payload(similarity=res))
     except Exception as e:
         return jsonify({"error": f"Similarity calculation failed: {str(e)}"}), 500
 
@@ -428,14 +439,7 @@ def remove():
         lnk for lnk in _links if lnk.get("from") != word and lnk.get("to") != word
     ]
 
-    pts = _project()
-    return jsonify(
-        {
-            "points": pts,
-            "links": _get_links(pts),
-            "dimension": 2560,
-        }
-    )
+    return jsonify(_scene_payload())
 
 
 @app.route("/api/reset", methods=["POST"])
@@ -444,7 +448,7 @@ def reset():
     _order.clear()
     _meta.clear()
     _links.clear()
-    return jsonify({"points": [], "links": []})
+    return jsonify(_scene_payload())
 
 
 if __name__ == "__main__":

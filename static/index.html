@@ -3,298 +3,966 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Embedding Space & Transformation Studio</title>
+<meta name="theme-color" content="#0c0d0f" />
+<title>Qwen3-Embedding-4B · Vector Algebra &amp; 3D Projection Instrument</title>
 <style>
   :root {
     color-scheme: dark;
-    accent-color: var(--primary);
-    --bg: #0b0d12;
-    --sidebar-bg: rgba(15, 18, 26, 0.88);
-    --border: rgba(255, 255, 255, 0.08);
-    --primary: #3b82f6;
-    --primary-hover: #60a5fa;
-    --accent-result: #f59e0b;
-    --accent-delta: #c084fc;
-    --accent-nearest: #10b981;
-    --accent-base: #38bdf8;
-    --accent-source: #f43f5e;
-    --accent-target: #34d399;
+    accent-color: #e5533d;
+    --bg-canvas: #0c0d0f;
+    --bg-panel: #121418;
+    --bg-elevated: #171a20;
+    --bg-input: #0e1014;
+    --border: #232730;
+    --border-strong: #323846;
+    --text-main: #eef0f4;
+    --text-muted: #8b93a0;
+    --text-dim: #5d6470;
+    --accent: #e5533d;
+    --accent-hover: #f0644e;
+    --sig-result: #e5533d;
+    --sig-delta: #d99b26;
+    --sig-nearest: #2ea073;
+    --sig-base: #4b8be5;
+    --sig-source: #d9536f;
+    --sig-target: #36a3b8;
+    --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
+
+  * {
+    box-sizing: border-box;
+  }
+
   html, body {
-    margin: 0; padding: 0; height: 100%;
-    background: var(--bg); color: #e6e8ee;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-canvas);
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.4;
     overflow: hidden;
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* Top Telemetry Bar */
+  #hud-topbar {
+    position: fixed;
+    top: 0;
+    left: 360px;
+    right: 0;
+    height: 38px;
+    background: rgba(18, 20, 24, 0.92);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 15;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    pointer-events: auto;
+  }
+
+  .hud-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .hud-metric {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .hud-key {
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .hud-val {
+    color: var(--text-main);
+    font-weight: 500;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sig-nearest);
+    display: inline-block;
+  }
+  .status-dot.idle {
+    background: var(--text-dim);
+  }
+
+  .hud-btn {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 4px 9px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: border-color 0.12s, background-color 0.12s;
+  }
+  .hud-btn:hover {
+    border-color: var(--border-strong);
+    background: #1f232b;
+  }
+
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  /* Left Workbench Sidebar */
   #sidebar {
-    position: fixed; top: 0; left: 0; width: 340px; height: 100%;
-    box-sizing: border-box; padding: 18px;
-    background: var(--sidebar-bg); backdrop-filter: blur(12px);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 360px;
+    height: 100%;
+    background: var(--bg-panel);
     border-right: 1px solid var(--border);
-    z-index: 10; display: flex; flex-direction: column; gap: 12px;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
   }
-  .header-row { display: flex; justify-content: space-between; align-items: baseline; }
-  h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: 0.2px; color: #fff; }
-  .badge-dim { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
-  .sub { font-size: 11px; color: #94a3b8; margin: 0; line-height: 1.4; }
 
-  /* Tabs */
-  .tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 3px; border-radius: 8px; border: 1px solid var(--border); }
+  .sidebar-header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  h1 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: var(--text-main);
+  }
+
+  .spec-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent);
+    border: 1px solid rgba(229, 83, 61, 0.35);
+    background: rgba(229, 83, 61, 0.08);
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  /* Segmented Workbench Tabs */
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-input);
+  }
+
   .tab-btn {
-    flex: 1; padding: 6px 10px; border-radius: 6px; border: none; background: transparent;
-    color: #94a3b8; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    padding: 9px 6px;
+    border: none;
+    border-right: 1px solid var(--border);
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.12s, background-color 0.12s;
   }
-  .tab-btn.active { background: #252a38; color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
-
-  /* Tab content */
-  .tab-pane { display: none; flex-direction: column; gap: 10px; }
-  .tab-pane.active { display: flex; }
-
-  form { display: flex; flex-direction: column; gap: 8px; }
-  .input-row { display: flex; gap: 6px; }
-  input[type=text] {
-    flex: 1; padding: 8px 10px; border-radius: 6px;
-    border: 1px solid rgba(255,255,255,0.12); background: #151923;
-    color: #e6e8ee; font-size: 13px; outline: none; transition: border-color 0.15s;
+  .tab-btn:last-child {
+    border-right: none;
   }
-  input[type=text]:focus { border-color: #60a5fa; }
-  .field-label { font-size: 11px; font-weight: 600; color: #cbd5e1; margin-bottom: 2px; }
-  .field-desc { font-size: 10px; color: #64748b; margin-top: -2px; }
+  .tab-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .tab-btn.active {
+    color: var(--text-main);
+    background: var(--bg-panel);
+    border-bottom-color: var(--accent);
+  }
+
+  /* Workbench Panes */
+  .workbench-body {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .tab-pane {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tab-pane.active {
+    display: flex;
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  input[type="text"],
+  select.preset-select {
+    width: 100%;
+    padding: 7px 9px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.12s;
+  }
+  input[type="text"]::placeholder {
+    color: var(--text-dim);
+  }
+  input[type="text"]:focus,
+  select.preset-select:focus {
+    border-color: var(--accent);
+  }
+
+  .field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+  }
+
+  .field-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .field-desc {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
 
   button.action-btn {
-    padding: 8px 12px; border-radius: 6px; border: none;
-    background: var(--primary); color: white; font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: background 0.15s, opacity 0.15s;
+    padding: 8px 12px;
+    border-radius: 3px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background-color 0.12s, opacity 0.12s;
+    white-space: nowrap;
   }
-  button.action-btn:hover { background: var(--primary-hover); }
-  button.action-btn:disabled { opacity: 0.5; cursor: default; }
+  button.action-btn:hover {
+    background: var(--accent-hover);
+  }
+  button.action-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
 
-  /* Chips */
-  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  button.micro-btn {
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    cursor: pointer;
+  }
+  button.micro-btn:hover {
+    color: var(--text-main);
+    border-color: var(--border-strong);
+  }
+
+  /* Technical Presets */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
   .chip {
-    font-size: 10.5px; padding: 3px 7px; border-radius: 4px;
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
-    color: #cbd5e1; cursor: pointer; transition: all 0.15s;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 3px 7px;
+    border-radius: 2px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.12s, color 0.12s;
   }
-  .chip:hover { background: rgba(59, 130, 246, 0.18); border-color: #3b82f6; color: #93c5fd; }
-
-  /* Presets selector */
-  select.preset-select {
-    width: 100%; padding: 6px 8px; border-radius: 6px;
-    background: #151923; border: 1px solid rgba(255,255,255,0.12);
-    color: #cbd5e1; font-size: 11px; outline: none;
+  .chip:hover {
+    border-color: var(--accent);
+    color: var(--text-main);
   }
-
-  .row-controls { display: flex; gap: 6px; }
-  .row-controls button {
-    flex: 1; padding: 6px 10px; border-radius: 6px;
-    background: transparent; border: 1px solid rgba(255,255,255,0.14);
-    color: #94a3b8; font-size: 11px; font-weight: 500; cursor: pointer;
-  }
-  .row-controls button:hover { background: rgba(255,255,255,0.06); color: #fff; }
 
   label.toggle {
-    display: flex; align-items: center; gap: 6px; font-size: 11px;
-    color: #94a3b8; cursor: pointer; user-select: none;
-  }
-
-  /* Result Card */
-  #result-card {
-    display: none; flex-direction: column; gap: 6px; padding: 10px;
-    background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25);
-    border-radius: 8px;
-  }
-  .result-header { font-size: 11px; color: #f59e0b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .result-formula { font-size: 12px; font-weight: 600; color: #fef08a; font-family: monospace; }
-  .closest-pill {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 6px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.18);
-    border: 1px solid rgba(16, 185, 129, 0.35); color: #a7f3d0; font-size: 12px; font-weight: 700;
-  }
-  .neighbors-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-  .neighbor-item { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
-  .neighbor-text { display: flex; justify-content: space-between; color: #cbd5e1; }
-  .sim-bar-wrap { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
-  .sim-bar-fill { height: 100%; background: #10b981; border-radius: 2px; }
-
-  #status { font-size: 11px; color: #94a3b8; min-height: 24px; line-height: 1.3; }
-
-  /* Plotted Words List */
-  #words-container { flex: 1; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 80px; }
-  #words { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-  #words li {
-    display: flex; align-items: center; justify-content: space-between;
-    font-size: 12px; padding: 6px 8px; border-radius: 5px;
-    background: rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s;
-  }
-  #words li:hover { background: rgba(255,255,255,0.08); }
-  .word-left { display: flex; align-items: center; gap: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-  .word-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-  .swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .type-tag { font-size: 9px; padding: 1px 4px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
-  .remove-btn {
-    border: none; background: transparent; color: #64748b; font-size: 13px;
-    line-height: 1; padding: 2px 5px; border-radius: 4px; cursor: pointer;
-  }
-  .remove-btn:hover { background: rgba(244, 63, 94, 0.2); color: #f43f5e; }
-
-  #hint { font-size: 10px; color: #64748b; line-height: 1.3; }
-
-  /* 3D Canvas elements */
-  #canvas-wrap { position: fixed; inset: 0; cursor: grab; }
-  #canvas-wrap.dragging { cursor: grabbing; }
-  .label {
-    font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 5px;
-    background: rgba(8, 10, 14, 0.82); white-space: nowrap;
-    transform: translateY(-16px);
-    cursor: pointer; pointer-events: auto; transition: transform 0.15s, background 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
     user-select: none;
   }
-  .label:hover { background: rgba(8, 10, 14, 0.98); transform: translateY(-16px) scale(1.1); }
+  label.toggle input {
+    margin: 0;
+  }
+
+  /* Inspector Readout Card */
+  #result-card {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .inspector-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .result-header {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .result-formula {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+    word-break: break-word;
+  }
+
+  .closest-pill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: 2px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-strong);
+    border-left: 3px solid var(--sig-nearest);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+  }
+
+  .closest-metrics {
+    display: flex;
+    gap: 8px;
+    color: var(--sig-nearest);
+    font-weight: 600;
+  }
+
+  .neighbors-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .neighbor-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3px 8px;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .neighbor-item:hover .neighbor-word {
+    color: var(--accent);
+  }
+  .neighbor-word {
+    color: var(--text-main);
+    transition: color 0.12s;
+  }
+  .neighbor-metrics {
+    color: var(--text-muted);
+    font-size: 10.5px;
+  }
+  .sim-bar-wrap {
+    grid-column: 1 / -1;
+    height: 3px;
+    background: var(--bg-input);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .sim-bar-fill {
+    height: 100%;
+    background: var(--sig-nearest);
+    transform-origin: left;
+  }
+
+  /* Active Vectors Registry */
+  .registry-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .registry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  #words-container {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 60px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg-input);
+  }
+
+  #words {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  #words li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    cursor: pointer;
+    content-visibility: auto;
+    contain-intrinsic-size: 29px;
+    transition: background-color 0.1s;
+  }
+  #words li:last-child {
+    border-bottom: none;
+  }
+  #words li:hover {
+    background: var(--bg-elevated);
+  }
+  #words li.selected {
+    background: rgba(229, 83, 61, 0.1);
+  }
+
+  .word-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .word-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .swatch {
+    width: 7px;
+    height: 7px;
+    border-radius: 1px;
+    flex-shrink: 0;
+  }
+
+  .coord-tag {
+    font-size: 9.5px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .type-tag {
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .remove-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1;
+    padding: 1px 4px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .remove-btn:hover {
+    background: rgba(217, 83, 111, 0.18);
+    color: var(--sig-source);
+  }
+
+  /* Footer Status & Controls */
+  .sidebar-footer {
+    padding: 10px 16px 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg-input);
+  }
+
+  .row-controls {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .row-controls button {
+    padding: 5px 6px;
+    border-radius: 2px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    cursor: pointer;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .row-controls button:hover {
+    border-color: var(--border-strong);
+    color: var(--text-main);
+  }
+
+  #status {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 3D Viewport & Labels */
+  #canvas-wrap {
+    position: fixed;
+    top: 0;
+    left: 360px;
+    right: 0;
+    bottom: 0;
+    cursor: grab;
+  }
+  #canvas-wrap.dragging {
+    cursor: grabbing;
+  }
+
+  .label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 2px;
+    background: rgba(12, 13, 15, 0.88);
+    border: 1px solid var(--border-strong);
+    white-space: nowrap;
+    transform: translateY(-15px);
+    cursor: pointer;
+    pointer-events: auto;
+    user-select: none;
+    transition: transform 0.12s ease-out, border-color 0.12s ease-out;
+  }
+  .label:hover,
+  .label.highlighted {
+    transform: translateY(-15px) scale(1.08);
+    z-index: 5;
+  }
+
+  .label-axis {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    pointer-events: none;
+    user-select: none;
+  }
+
   .label-link {
-    font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
-    background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.15);
-    color: #94a3b8; pointer-events: none;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 5px;
+    border-radius: 2px;
+    background: rgba(12, 13, 15, 0.9);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Native Top-Layer Similarity Matrix Dialog */
+  dialog#matrix-dialog {
+    background: var(--bg-panel);
+    color: var(--text-main);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    padding: 0;
+    max-width: 82vw;
+    max-height: 80vh;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+      opacity 0.16s ease-out,
+      transform 0.16s ease-out,
+      overlay 0.16s allow-discrete,
+      display 0.16s allow-discrete;
+  }
+
+  dialog#matrix-dialog[open] {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @starting-style {
+    dialog#matrix-dialog[open] {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  dialog#matrix-dialog::backdrop {
+    background: rgba(6, 7, 9, 0.65);
+  }
+
+  .dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+  }
+
+  .dialog-body {
+    padding: 16px;
+    overflow: auto;
+    max-height: calc(80vh - 52px);
+  }
+
+  table.sim-matrix {
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  table.sim-matrix th,
+  table.sim-matrix td {
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  table.sim-matrix th {
+    background: var(--bg-input);
+    color: var(--text-muted);
+    font-weight: 500;
+    text-align: left;
+  }
+
+  table.sim-matrix td.sim-cell {
+    cursor: pointer;
+    transition: outline 0.1s;
+  }
+  table.sim-matrix td.sim-cell:hover {
+    outline: 1px solid var(--accent);
+    z-index: 2;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .label,
+    dialog#matrix-dialog {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 820px) {
+    #sidebar {
+      width: 300px;
+    }
+    #hud-topbar,
+    #canvas-wrap {
+      left: 300px;
+    }
   }
 </style>
 </head>
 <body>
-  <div id="sidebar">
-    <div class="header-row">
-      <h1>Embedding Space</h1>
-      <span class="badge-dim" id="badge-dim">2560-dim → 3D</span>
-    </div>
-    <p class="sub">Qwen3-Embedding-4B vector arithmetic & semantic transformation visualizer.</p>
-
-    <!-- Navigation Tabs -->
-    <div class="tabs">
-      <button class="tab-btn active" id="tab-embed-btn">Expression</button>
-      <button class="tab-btn" id="tab-transform-btn">Transform</button>
-      <button class="tab-btn" id="tab-sim-btn">Compare</button>
+  <!-- Left Workbench Panel -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="header-top">
+        <h1>Vector Embedding Instrument</h1>
+        <span class="spec-tag" id="badge-dim">ℝ²⁵⁶⁰ → ℝ³</span>
+      </div>
+      <p class="sub">Qwen3-Embedding-4B · Algebraic &amp; Analogical Projection</p>
     </div>
 
-    <!-- Tab 1: Single Word & Arithmetic Expressions -->
-    <div class="tab-pane active" id="pane-embed">
-      <form id="form-embed">
-        <div class="input-row">
-          <input id="word-input" type="text" placeholder="e.g. king - man + woman" autocomplete="off" autofocus />
-          <button type="submit" class="action-btn" id="plot-btn">Plot</button>
+    <!-- Segmented Navigation -->
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" id="tab-embed-btn" role="tab" aria-selected="true">01 EXPR</button>
+      <button class="tab-btn" id="tab-transform-btn" role="tab" aria-selected="false">02 TRANSFORM</button>
+      <button class="tab-btn" id="tab-sim-btn" role="tab" aria-selected="false">03 COMPARE</button>
+    </div>
+
+    <div class="workbench-body">
+      <!-- Tab 1: Single Word & Arithmetic Expressions -->
+      <div class="tab-pane active" id="pane-embed" role="tabpanel">
+        <form id="form-embed">
+          <div class="field-header">
+            <span class="field-label">Concept or Linear Combination</span>
+            <kbd>/</kbd>
+          </div>
+          <div class="input-row">
+            <input id="word-input" type="text" placeholder="king - man + woman" autocomplete="off" autofocus />
+            <button type="submit" class="action-btn" id="plot-btn">Evaluate</button>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="exclude-inputs-embed" checked />
+            Exclude query operands from nearest lookup
+          </label>
+        </form>
+        <div class="chips">
+          <span class="chip" data-expr="king - man + woman">king - man + woman</span>
+          <span class="chip" data-expr="woman - man">woman - man</span>
+          <span class="chip" data-expr="paris - france + italy">paris - france + italy</span>
+          <span class="chip" data-expr="doctor - man + woman">doctor - man + woman</span>
         </div>
-        <label class="toggle">
-          <input type="checkbox" id="exclude-inputs-embed" checked />
-          Exclude input terms from nearest match
-        </label>
-      </form>
-      <div class="chips">
-        <span class="chip" data-expr="king - man + woman">👑 king - man + woman</span>
-        <span class="chip" data-expr="woman - man">⚡ woman - man</span>
-        <span class="chip" data-expr="paris - france + italy">🏛 paris - france + italy</span>
-        <span class="chip" data-expr="doctor - man + woman">🩺 doctor - man + woman</span>
+      </div>
+
+      <!-- Tab 2: Semantic Transformation Studio -->
+      <div class="tab-pane" id="pane-transform" role="tabpanel">
+        <form id="form-transform">
+          <div>
+            <div class="field-header">
+              <span class="field-label">Benchmark Analogies</span>
+            </div>
+            <select class="preset-select" id="preset-select">
+              <option value="">Select benchmark transformation...</option>
+              <option value="uncle,man,woman">uncle + (woman - man) → aunt</option>
+              <option value="king,man,woman">king + (woman - man) → queen</option>
+              <option value="brother,boy,girl">brother + (girl - boy) → sister</option>
+              <option value="paris,france,italy">paris + (italy - france) → rome</option>
+              <option value="good,best,worst">good + (worst - best) → bad</option>
+              <option value="puppy,dog,cat">puppy + (cat - dog) → kitten</option>
+            </select>
+          </div>
+
+          <div>
+            <div class="field-header">
+              <span class="field-label">Base Concept (v₀)</span>
+            </div>
+            <input id="trans-base" type="text" placeholder="uncle" autocomplete="off" />
+          </div>
+
+          <div>
+            <div class="field-header">
+              <span class="field-label">Displacement Axis (Δ = Target − Source)</span>
+              <button type="button" class="micro-btn" id="swap-axis-btn" title="Invert Target and Source">Swap ↔</button>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <div style="flex: 1;">
+                <input id="trans-target" type="text" placeholder="+ target (woman)" autocomplete="off" />
+              </div>
+              <div style="flex: 1;">
+                <input id="trans-source" type="text" placeholder="− source (man)" autocomplete="off" />
+              </div>
+            </div>
+          </div>
+
+          <label class="toggle">
+            <input type="checkbox" id="plot-components-toggle" checked />
+            Plot intermediate basis vectors (v₀, +, −, Δ)
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="exclude-inputs-transform" checked />
+            Exclude query operands from nearest lookup
+          </label>
+
+          <button type="submit" class="action-btn" id="trans-btn">Compute v₀ + Δ &amp; Project</button>
+        </form>
+      </div>
+
+      <!-- Tab 3: Pairwise Cosine Similarity Comparison -->
+      <div class="tab-pane" id="pane-sim" role="tabpanel">
+        <form id="form-sim">
+          <div style="display: flex; gap: 6px;">
+            <div style="flex: 1;">
+              <div class="field-header"><span class="field-label">Vector A</span></div>
+              <input id="sim-word-a" type="text" placeholder="king" autocomplete="off" />
+            </div>
+            <div style="flex: 1;">
+              <div class="field-header"><span class="field-label">Vector B</span></div>
+              <input id="sim-word-b" type="text" placeholder="queen" autocomplete="off" />
+            </div>
+          </div>
+          <button type="submit" class="action-btn" id="sim-btn">Measure Cosine &amp; Angle</button>
+        </form>
+        <div class="chips">
+          <span class="chip sim-chip" data-pair="king,queen">king / queen</span>
+          <span class="chip sim-chip" data-pair="ocean,sea">ocean / sea</span>
+          <span class="chip sim-chip" data-pair="good,bad">good / bad</span>
+          <span class="chip sim-chip" data-pair="cat,dog">cat / dog</span>
+        </div>
       </div>
     </div>
 
-    <!-- Tab 2: Dedicated Semantic Transformation Studio -->
-    <div class="tab-pane" id="pane-transform">
-      <form id="form-transform">
-        <div>
-          <div class="field-label">Preset Analogies</div>
-          <select class="preset-select" id="preset-select">
-            <option value="">-- Choose a benchmark analogy --</option>
-            <option value="uncle,man,woman">uncle + (woman - man) → aunt</option>
-            <option value="king,man,woman">king + (woman - man) → queen</option>
-            <option value="brother,boy,girl">brother + (girl - boy) → sister</option>
-            <option value="paris,france,italy">paris + (italy - france) → rome</option>
-            <option value="good,best,worst">good + (worst - best) → bad</option>
-            <option value="puppy,dog,cat">puppy + (cat - dog) → kitten</option>
-          </select>
-        </div>
-
-        <div>
-          <div class="field-label">1. Base Vector (Starting concept)</div>
-          <input id="trans-base" type="text" placeholder="e.g. uncle" autocomplete="off" />
-        </div>
-
-        <div style="display: flex; gap: 6px;">
-          <div style="flex: 1;">
-            <div class="field-label">2. Target (+)</div>
-            <input id="trans-target" type="text" placeholder="e.g. woman" autocomplete="off" />
-          </div>
-          <div style="flex: 1;">
-            <div class="field-label">3. Source (-)</div>
-            <input id="trans-source" type="text" placeholder="e.g. man" autocomplete="off" />
-          </div>
-        </div>
-        <div class="field-desc">Δ = Target - Source (semantic shift direction)</div>
-
-        <label class="toggle">
-          <input type="checkbox" id="plot-components-toggle" checked />
-          Plot component vectors &amp; helper lines
-        </label>
-        <label class="toggle">
-          <input type="checkbox" id="exclude-inputs-transform" checked />
-          Exclude input terms from nearest match
-        </label>
-
-        <button type="submit" class="action-btn" id="trans-btn">Apply Transformation &amp; Plot</button>
-      </form>
-    </div>
-
-    <!-- Tab 3: Pairwise Cosine Similarity Comparison -->
-    <div class="tab-pane" id="pane-sim">
-      <form id="form-sim">
-        <div>
-          <div class="field-label">Concept A</div>
-          <input id="sim-word-a" type="text" placeholder="e.g. king" autocomplete="off" />
-        </div>
-        <div>
-          <div class="field-label">Concept B</div>
-          <input id="sim-word-b" type="text" placeholder="e.g. queen" autocomplete="off" />
-        </div>
-        <button type="submit" class="action-btn" id="sim-btn">Compare &amp; Link in 3D</button>
-      </form>
-      <div class="chips">
-        <span class="chip sim-chip" data-pair="king,queen">👑 king ↔ queen</span>
-        <span class="chip sim-chip" data-pair="ocean,sea">🌊 ocean ↔ sea</span>
-        <span class="chip sim-chip" data-pair="good,bad">⚖️ good ↔ bad</span>
-        <span class="chip sim-chip" data-pair="cat,dog">🐾 cat ↔ dog</span>
-      </div>
-    </div>
-
-    <!-- Active Result / Closest Word Card -->
+    <!-- Active Result / Closest Word Readout -->
     <div id="result-card">
-      <div class="result-header" id="card-header">Semantic Neighborhood</div>
+      <div class="inspector-top">
+        <span class="result-header" id="card-header">Nearest Vocabulary Match</span>
+        <span class="field-desc" id="card-angle"></span>
+      </div>
       <div class="result-formula" id="card-formula">uncle + (woman - man)</div>
       <div class="closest-pill">
-        <span id="card-closest-label">🎯 Closest Word: <span id="card-closest-word">aunt</span></span>
-        <span id="card-closest-sim">0.820</span>
+        <span id="card-closest-label">Match: <strong id="card-closest-word">aunt</strong></span>
+        <span class="closest-metrics" id="card-closest-sim">0.8201</span>
       </div>
       <div class="neighbors-list" id="card-neighbors"></div>
     </div>
 
-    <!-- View & Scene Controls -->
-    <div class="row-controls">
-      <button id="reset-view-btn" type="button">Reset camera</button>
-      <button id="reset-btn" type="button">Clear scene</button>
+    <!-- Active Plotted Items Registry -->
+    <div class="registry-section">
+      <div class="registry-header">
+        <span class="field-label">Active Vector Registry</span>
+        <span class="field-desc" id="registry-count">0 vectors</span>
+      </div>
+      <div id="words-container">
+        <ul id="words"></ul>
+      </div>
     </div>
 
-    <label class="toggle">
-      <input type="checkbox" id="autorotate-toggle" />
-      Auto-rotate scene
-    </label>
-
-    <div id="status">Ready. Enter a word or transformation.</div>
-
-    <!-- Active Plotted Items -->
-    <div class="field-label">Active Vectors in Scene</div>
-    <div id="words-container">
-      <ul id="words"></ul>
+    <!-- Footer Controls & Status -->
+    <div class="sidebar-footer">
+      <div class="row-controls">
+        <button id="reset-view-btn" type="button" title="Shortcut: R">Reset Cam [R]</button>
+        <button id="open-matrix-btn" type="button" title="Shortcut: M">Matrix [M]</button>
+        <button id="reset-btn" type="button">Clear Scene</button>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <label class="toggle">
+          <input type="checkbox" id="autorotate-toggle" />
+          Auto-orbit [Space]
+        </label>
+        <span class="field-desc">L-drag: orbit · R-drag: pan</span>
+      </div>
+      <div id="status">Ready. Enter a concept or algebraic expression.</div>
     </div>
+  </aside>
 
-    <div id="hint">Drag: rotate · Scroll: zoom · Right-drag: pan · Click any word or line to focus camera</div>
-  </div>
+  <!-- Top Telemetry Bar -->
+  <header id="hud-topbar">
+    <div class="hud-group">
+      <div class="hud-metric">
+        <span class="hud-key">Model</span>
+        <span class="hud-val">Qwen3-4B (fp16)</span>
+      </div>
+      <div class="hud-metric">
+        <span class="hud-key">Vocab</span>
+        <span class="hud-val" id="hud-vocab">2,500</span>
+      </div>
+      <div class="hud-metric">
+        <span class="hud-key">PCA Var (3D)</span>
+        <span class="hud-val" id="hud-variance">—</span>
+      </div>
+    </div>
+    <div class="hud-group">
+      <div class="hud-metric">
+        <span class="status-dot idle" id="render-dot"></span>
+        <span class="hud-key">Engine</span>
+        <span class="hud-val" id="hud-engine">IDLE · 0% GPU</span>
+      </div>
+      <button type="button" class="hud-btn" id="hud-matrix-btn">Cosine Matrix [M]</button>
+    </div>
+  </header>
 
-  <div id="canvas-wrap"></div>
+  <!-- 3D WebGL Viewport -->
+  <main id="canvas-wrap"></main>
+
+  <!-- Native Top-Layer Similarity Matrix Dialog -->
+  <dialog id="matrix-dialog">
+    <div class="dialog-header">
+      <div>
+        <strong style="font-size: 12px;">Pairwise Cosine Similarity Matrix (ℝ²⁵⁶⁰)</strong>
+        <span style="color: var(--text-muted); font-size: 11px; margin-left: 10px;">Click any cell to link &amp; inspect pair</span>
+      </div>
+      <button type="button" class="hud-btn" id="close-matrix-btn">Close [Esc]</button>
+    </div>
+    <div class="dialog-body" id="matrix-container">
+      <p style="color: var(--text-muted); font-family: var(--font-mono); margin: 0;">Plot at least 2 vectors to compute pairwise matrix.</p>
+    </div>
+  </dialog>
 
   <script type="importmap">
   {
@@ -310,49 +978,80 @@
     import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 
     const wrap = document.getElementById("canvas-wrap");
+    const getViewportWidth = () => wrap.clientWidth || (window.innerWidth - 360);
+    const getViewportHeight = () => wrap.clientHeight || window.innerHeight;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b0d12);
+    scene.background = new THREE.Color(0x0c0d0f);
 
-    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(9, 7, 9);
+    const camera = new THREE.PerspectiveCamera(46, getViewportWidth() / getViewportHeight(), 0.1, 200);
+    const DEFAULT_CAM_POS = new THREE.Vector3(8.5, 6.2, 8.5);
+    camera.position.copy(DEFAULT_CAM_POS);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    // High-efficiency WebGLRenderer: capped pixelRatio<=2, powerPreference high-performance
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+    });
+    renderer.setSize(getViewportWidth(), getViewportHeight());
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     wrap.appendChild(renderer.domElement);
 
     const labelRenderer = new CSS2DRenderer();
-    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.setSize(getViewportWidth(), getViewportHeight());
     labelRenderer.domElement.style.position = "absolute";
     labelRenderer.domElement.style.top = "0";
     labelRenderer.domElement.style.left = "0";
     labelRenderer.domElement.style.pointerEvents = "none";
     wrap.appendChild(labelRenderer.domElement);
 
-    const DEFAULT_CAM_POS = new THREE.Vector3(9, 7, 9);
-
     const controls = new OrbitControls(camera, labelRenderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
+    controls.dampingFactor = 0.12;
     controls.enableZoom = true;
     controls.enablePan = true;
     controls.enableRotate = true;
     controls.screenSpacePanning = true;
     controls.zoomSpeed = 1.15;
     controls.panSpeed = 0.9;
-    controls.rotateSpeed = 0.9;
+    controls.rotateSpeed = 0.85;
     controls.minDistance = 1.5;
-    controls.maxDistance = 45;
-    controls.autoRotateSpeed = 1.1;
-    controls.listenToKeyEvents(window);
+    controls.maxDistance = 42;
+    controls.autoRotateSpeed = 1.0;
 
-    controls.addEventListener("start", () => wrap.classList.add("dragging"));
-    controls.addEventListener("end", () => wrap.classList.remove("dragging"));
+    // Reference Grid, Polar Rings & Principal Axes
+    const grid = new THREE.GridHelper(12, 12, 0x232730, 0x161920);
+    scene.add(grid);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-    scene.add(new THREE.GridHelper(14, 14, 0x22262f, 0x1a1d24));
-    scene.add(new THREE.AxesHelper(6));
+    function createPolarRing(radius, colorHex) {
+      const segments = 72;
+      const pts = [];
+      for (let i = 0; i <= segments; i++) {
+        const theta = (i / segments) * Math.PI * 2;
+        pts.push(new THREE.Vector3(Math.cos(theta) * radius, 0.002, Math.sin(theta) * radius));
+      }
+      const geom = new THREE.BufferGeometry().setFromPoints(pts);
+      return new THREE.Line(geom, new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.45 }));
+    }
+    scene.add(createPolarRing(2.5, 0x232730));
+    scene.add(createPolarRing(5.0, 0x2d3340));
+
+    const axes = new THREE.AxesHelper(5.5);
+    scene.add(axes);
+
+    // Axis Labels (PC1, PC2, PC3)
+    [
+      { text: "PC1 (X)", pos: [5.8, 0, 0] },
+      { text: "PC2 (Y)", pos: [0, 5.8, 0] },
+      { text: "PC3 (Z)", pos: [0, 0, 5.8] },
+    ].forEach(({ text, pos }) => {
+      const el = document.createElement("div");
+      el.className = "label-axis";
+      el.textContent = text;
+      const obj = new CSS2DObject(el);
+      obj.position.set(...pos);
+      scene.add(obj);
+    });
 
     const vectorGroup = new THREE.Group();
     scene.add(vectorGroup);
@@ -360,13 +1059,35 @@
     const lineGroup = new THREE.Group();
     scene.add(lineGroup);
 
+    // Shared unit sphere geometry to avoid per-node geometry allocations
+    const sharedTipSphereGeometry = new THREE.SphereGeometry(1, 14, 14);
+    const labelDomMap = new Map();
+    let latestMatrixData = { words: [], matrix: [] };
+
+    // Proper WebGL memory & DOM cleanup
+    function disposeGroup(group) {
+      while (group.children.length > 0) {
+        const child = group.children[0];
+        group.remove(child);
+        child.traverse((obj) => {
+          if (obj.isCSS2DObject && obj.element && obj.element.parentNode) {
+            obj.element.parentNode.removeChild(obj.element);
+          }
+          if (obj.geometry && obj.geometry !== sharedTipSphereGeometry) {
+            obj.geometry.dispose();
+          }
+          if (obj.material) {
+            if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+            else obj.material.dispose();
+          }
+        });
+      }
+    }
+
     function clearSceneElements() {
-      while (vectorGroup.children.length) {
-        vectorGroup.remove(vectorGroup.children[0]);
-      }
-      while (lineGroup.children.length) {
-        lineGroup.remove(lineGroup.children[0]);
-      }
+      disposeGroup(vectorGroup);
+      disposeGroup(lineGroup);
+      labelDomMap.clear();
     }
 
     function addVector(point) {
@@ -380,47 +1101,45 @@
       const isNearest = point.type === "nearest";
       const isDelta = point.type === "delta";
 
-      // Vector Arrow
       const arrow = new THREE.ArrowHelper(
         normDir,
         new THREE.Vector3(0, 0, 0),
         length,
         color,
-        isResult ? Math.min(0.7, length * 0.25) : Math.min(0.5, length * 0.2),
-        isResult ? Math.min(0.4, length * 0.18) : Math.min(0.3, length * 0.15)
+        isResult ? Math.min(0.65, length * 0.24) : Math.min(0.45, length * 0.18),
+        isResult ? Math.min(0.36, length * 0.16) : Math.min(0.26, length * 0.13)
       );
       arrow.userData.point = point;
       vectorGroup.add(arrow);
 
-      // Sphere tip marker
-      const sphereRadius = isResult ? 0.16 : (isNearest ? 0.14 : 0.1);
+      const sphereRadius = isResult ? 0.15 : (isNearest ? 0.13 : 0.095);
       const dot = new THREE.Mesh(
-        new THREE.SphereGeometry(sphereRadius, 16, 16),
+        sharedTipSphereGeometry,
         new THREE.MeshBasicMaterial({ color })
       );
+      dot.scale.setScalar(sphereRadius);
       dot.position.copy(dir);
       dot.userData.point = point;
       vectorGroup.add(dot);
 
-      // Label DOM Element
       const div = document.createElement("div");
       div.className = "label";
       let prefix = "";
-      if (isResult) prefix = "⭐ ";
-      else if (isNearest) prefix = "🎯 ";
-      else if (isDelta) prefix = "Δ ";
+      if (isResult) prefix = "[=] ";
+      else if (isNearest) prefix = "[≈] ";
+      else if (isDelta) prefix = "[Δ] ";
 
       div.textContent = `${prefix}${point.word}`;
       div.style.color = point.color;
-      div.style.border = `1px solid ${point.color}66`;
+      div.style.borderColor = `${point.color}88`;
       if (isResult) {
-        div.style.boxShadow = `0 0 12px ${point.color}44`;
-        div.style.fontWeight = "700";
+        div.style.fontWeight = "600";
       }
-      div.addEventListener("click", () => focusOnPoint(dir));
+      div.addEventListener("click", () => selectPoint(point));
       const labelObj = new CSS2DObject(div);
       labelObj.position.copy(dir);
       vectorGroup.add(labelObj);
+      labelDomMap.set(point.word, div);
     }
 
     function addLinks(links) {
@@ -429,7 +1148,7 @@
         const to = new THREE.Vector3(...link.to_coord);
 
         const geom = new THREE.BufferGeometry().setFromPoints([from, to]);
-        const color = new THREE.Color(link.color || 0x94a3b8);
+        const color = new THREE.Color(link.color || 0x8b93a0);
 
         let lineMat;
         if (link.style === "dotted" || link.style === "dashed") {
@@ -437,17 +1156,15 @@
             color,
             dashSize: 0.2,
             gapSize: 0.12,
-            linewidth: 1.5,
           });
         } else {
-          lineMat = new THREE.LineBasicMaterial({ color, linewidth: 1.2 });
+          lineMat = new THREE.LineBasicMaterial({ color });
         }
 
         const line = new THREE.Line(geom, lineMat);
         line.computeLineDistances();
         lineGroup.add(line);
 
-        // Optional midpoint label
         if (link.label) {
           const mid = from.clone().lerp(to, 0.5);
           const div = document.createElement("div");
@@ -461,11 +1178,29 @@
       });
     }
 
+    function cosToDegrees(sim) {
+      const clamped = Math.max(-1, Math.min(1, sim));
+      return ((Math.acos(clamped) * 180) / Math.PI).toFixed(1);
+    }
+
+    function selectPoint(p) {
+      focusOnPoint(new THREE.Vector3(p.x, p.y, p.z));
+      document.querySelectorAll("#words li").forEach((el) => {
+        el.classList.toggle("selected", el.dataset.word === p.word);
+      });
+      if (p.meta && p.meta.nearest_words) {
+        displayResultCard(p.word, p.meta.closest_word, p.meta.closest_similarity, p.meta.nearest_words);
+      }
+    }
+
     function renderWordList(points) {
       const ul = document.getElementById("words");
       ul.innerHTML = "";
+      document.getElementById("registry-count").textContent = `${points.length} vector${points.length === 1 ? "" : "s"}`;
+
       points.forEach((p) => {
         const li = document.createElement("li");
+        li.dataset.word = p.word;
 
         const left = document.createElement("div");
         left.className = "word-left";
@@ -484,11 +1219,16 @@
         const right = document.createElement("div");
         right.className = "word-right";
 
+        const coords = document.createElement("span");
+        coords.className = "coord-tag";
+        coords.textContent = `${p.x.toFixed(1)},${p.y.toFixed(1)},${p.z.toFixed(1)}`;
+        right.appendChild(coords);
+
         if (p.type && p.type !== "word") {
           const tag = document.createElement("span");
           tag.className = "type-tag";
           tag.textContent = p.type;
-          tag.style.background = `${p.color}33`;
+          tag.style.background = `${p.color}22`;
           tag.style.color = p.color;
           right.appendChild(tag);
         }
@@ -505,54 +1245,173 @@
         right.appendChild(rmBtn);
         li.appendChild(right);
 
-        li.addEventListener("click", () => {
-          focusOnPoint(new THREE.Vector3(p.x, p.y, p.z));
-          if (p.meta && p.meta.nearest_words) {
-            displayResultCard(p.word, p.meta.closest_word, p.meta.closest_similarity, p.meta.nearest_words);
-          }
+        li.addEventListener("pointerenter", () => {
+          const domLabel = labelDomMap.get(p.word);
+          if (domLabel) domLabel.classList.add("highlighted");
         });
+        li.addEventListener("pointerleave", () => {
+          const domLabel = labelDomMap.get(p.word);
+          if (domLabel) domLabel.classList.remove("highlighted");
+        });
+        li.addEventListener("click", () => selectPoint(p));
         ul.appendChild(li);
       });
     }
 
-    function displayResultCard(formula, closestWord, similarity, nearestWords, headerText = "Semantic Neighborhood", labelPrefix = "🎯 Closest Word") {
-      const card = document.getElementById("result-card");
-      document.getElementById("card-header").textContent = headerText;
-      document.getElementById("card-formula").textContent = formula;
-      document.getElementById("card-closest-label").innerHTML = `${labelPrefix}: <span id="card-closest-word">${closestWord || "None"}</span>`;
-      document.getElementById("card-closest-sim").textContent = typeof similarity === "number" ? similarity.toFixed(4) : "";
+    function displayResultCard(formula, closestWord, similarity, nearestWords, headerText = "Nearest Vocabulary Match", labelPrefix = "Match") {
+      const updateDOM = () => {
+        const card = document.getElementById("result-card");
+        document.getElementById("card-header").textContent = headerText;
+        document.getElementById("card-formula").textContent = formula;
+        document.getElementById("card-closest-label").innerHTML = `${labelPrefix}: <strong id="card-closest-word">${closestWord || "None"}</strong>`;
 
-      const neighborsContainer = document.getElementById("card-neighbors");
-      neighborsContainer.innerHTML = "";
+        if (typeof similarity === "number") {
+          const deg = cosToDegrees(similarity);
+          document.getElementById("card-closest-sim").textContent = `cos ${similarity.toFixed(4)}`;
+          document.getElementById("card-angle").textContent = `θ = ${deg}°`;
+        } else {
+          document.getElementById("card-closest-sim").textContent = "";
+          document.getElementById("card-angle").textContent = "";
+        }
 
-      (nearestWords || []).forEach((item) => {
-        const itemDiv = document.createElement("div");
-        itemDiv.className = "neighbor-item";
+        const neighborsContainer = document.getElementById("card-neighbors");
+        neighborsContainer.innerHTML = "";
 
-        const textDiv = document.createElement("div");
-        textDiv.className = "neighbor-text";
-        textDiv.innerHTML = `<span>${item.word}</span><span>${item.similarity.toFixed(4)}</span>`;
+        (nearestWords || []).forEach((item) => {
+          const itemDiv = document.createElement("div");
+          itemDiv.className = "neighbor-item";
+          itemDiv.title = `Click to plot "${item.word}"`;
 
-        const barWrap = document.createElement("div");
-        barWrap.className = "sim-bar-wrap";
+          const wordSpan = document.createElement("span");
+          wordSpan.className = "neighbor-word";
+          wordSpan.textContent = item.word;
 
-        const barFill = document.createElement("div");
-        barFill.className = "sim-bar-fill";
-        const pct = Math.max(0, Math.min(100, (item.similarity) * 100));
-        barFill.style.width = `${pct}%`;
+          const metricSpan = document.createElement("span");
+          metricSpan.className = "neighbor-metrics";
+          metricSpan.textContent = `${item.similarity.toFixed(4)} (${cosToDegrees(item.similarity)}°)`;
 
-        barWrap.appendChild(barFill);
-        itemDiv.appendChild(textDiv);
-        itemDiv.appendChild(barWrap);
-        neighborsContainer.appendChild(itemDiv);
-      });
+          const barWrap = document.createElement("div");
+          barWrap.className = "sim-bar-wrap";
 
-      card.style.display = "flex";
+          const barFill = document.createElement("div");
+          barFill.className = "sim-bar-fill";
+          const pct = Math.max(0, Math.min(100, item.similarity * 100));
+          barFill.style.width = `${pct}%`;
+
+          barWrap.appendChild(barFill);
+          itemDiv.appendChild(wordSpan);
+          itemDiv.appendChild(metricSpan);
+          itemDiv.appendChild(barWrap);
+          itemDiv.addEventListener("click", () => {
+            if (!item.word.includes(" ")) plotWord(item.word);
+          });
+          neighborsContainer.appendChild(itemDiv);
+        });
+
+        card.style.display = "flex";
+      };
+
+      if (document.startViewTransition) {
+        document.startViewTransition(updateDOM);
+      } else {
+        updateDOM();
+      }
     }
 
-    // Camera transitions
+    function updateTelemetry(data) {
+      if (data.vocab_size) {
+        document.getElementById("hud-vocab").textContent = data.vocab_size.toLocaleString();
+      }
+      const varEl = document.getElementById("hud-variance");
+      if (Array.isArray(data.explained_variance) && data.explained_variance.length === 3) {
+        const total = (data.explained_variance.reduce((a, b) => a + b, 0) * 100).toFixed(1);
+        varEl.textContent = `${total}% (${data.explained_variance.map((v) => (v * 100).toFixed(0)).join("/")}%)`;
+      } else {
+        varEl.textContent = data.points && data.points.length > 0 ? "Fixed Proj (<3)" : "—";
+      }
+      if (data.similarity_matrix) {
+        latestMatrixData = data.similarity_matrix;
+        if (document.getElementById("matrix-dialog").open) {
+          renderMatrixTable();
+        }
+      }
+    }
+
+    function renderMatrixTable() {
+      const container = document.getElementById("matrix-container");
+      const { words, matrix } = latestMatrixData;
+      if (!words || words.length < 2) {
+        container.innerHTML = `<p style="color: var(--text-muted); font-family: var(--font-mono); margin: 0;">Plot at least 2 vectors to compute pairwise cosine matrix.</p>`;
+        return;
+      }
+      const table = document.createElement("table");
+      table.className = "sim-matrix";
+      const thead = document.createElement("thead");
+      const hRow = document.createElement("tr");
+      const corner = document.createElement("th");
+      corner.textContent = "cos θ";
+      hRow.appendChild(corner);
+      words.forEach((w) => {
+        const th = document.createElement("th");
+        th.textContent = w;
+        hRow.appendChild(th);
+      });
+      thead.appendChild(hRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      matrix.forEach((row, rIdx) => {
+        const tr = document.createElement("tr");
+        const rowHeader = document.createElement("th");
+        rowHeader.textContent = words[rIdx];
+        tr.appendChild(rowHeader);
+
+        row.forEach((val, cIdx) => {
+          const td = document.createElement("td");
+          td.className = "sim-cell";
+          td.textContent = val.toFixed(3);
+          const alpha = Math.max(0.04, Math.min(0.45, Math.abs(val) * 0.45));
+          if (rIdx === cIdx) {
+            td.style.color = "var(--text-dim)";
+          } else if (val >= 0) {
+            td.style.background = `rgba(46, 160, 115, ${alpha.toFixed(2)})`;
+          } else {
+            td.style.background = `rgba(217, 83, 111, ${alpha.toFixed(2)})`;
+          }
+          td.title = `${words[rIdx]} ↔ ${words[cIdx]}: cos = ${val.toFixed(4)} (${cosToDegrees(val)}°)`;
+          td.addEventListener("click", () => {
+            if (rIdx !== cIdx) {
+              document.getElementById("matrix-dialog").close();
+              compareWords(words[rIdx], words[cIdx]);
+            }
+          });
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      container.innerHTML = "";
+      container.appendChild(table);
+    }
+
+    // Demand-driven zero-overhead render loop
     let camAnim = null;
-    function animateCameraTo(toTarget, toCamPos, duration = 650) {
+    let rafId = null;
+    let idleTimeout = null;
+    const renderDot = document.getElementById("render-dot");
+    const hudEngine = document.getElementById("hud-engine");
+
+    function setEngineState(active, frameMs = 0) {
+      if (active) {
+        renderDot.classList.remove("idle");
+        hudEngine.textContent = `ACTIVE · ${frameMs.toFixed(1)} ms`;
+      } else {
+        renderDot.classList.add("idle");
+        hudEngine.textContent = "IDLE · 0% GPU";
+      }
+    }
+
+    function animateCameraTo(toTarget, toCamPos, duration = 520) {
       camAnim = {
         fromTarget: controls.target.clone(),
         toTarget: toTarget.clone(),
@@ -561,6 +1420,7 @@
         start: performance.now(),
         duration,
       };
+      requestRender();
     }
 
     function focusOnPoint(vec3) {
@@ -573,13 +1433,48 @@
     }
 
     function updateCameraAnim() {
-      if (!camAnim) return;
+      if (!camAnim) return false;
       const t = Math.min(1, (performance.now() - camAnim.start) / camAnim.duration);
       const ease = 1 - Math.pow(1 - t, 3);
       controls.target.lerpVectors(camAnim.fromTarget, camAnim.toTarget, ease);
       camera.position.lerpVectors(camAnim.fromCamPos, camAnim.toCamPos, ease);
       if (t >= 1) camAnim = null;
+      return true;
     }
+
+    function renderFrame() {
+      rafId = null;
+      const t0 = performance.now();
+      const animActive = updateCameraAnim();
+      const controlsMoved = controls.update();
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+      const dt = performance.now() - t0;
+      setEngineState(true, dt);
+
+      if (animActive || controlsMoved || controls.autoRotate) {
+        requestRender();
+      } else {
+        clearTimeout(idleTimeout);
+        idleTimeout = setTimeout(() => setEngineState(false), 180);
+      }
+    }
+
+    function requestRender() {
+      if (rafId === null) {
+        rafId = requestAnimationFrame(renderFrame);
+      }
+    }
+
+    controls.addEventListener("change", requestRender);
+    controls.addEventListener("start", () => {
+      wrap.classList.add("dragging");
+      requestRender();
+    });
+    controls.addEventListener("end", () => {
+      wrap.classList.remove("dragging");
+      requestRender();
+    });
 
     // Raycaster for 3D click selection
     const raycaster = new THREE.Raycaster();
@@ -596,19 +1491,16 @@
       pointerDownAt = null;
       if (moved > 5) return;
 
-      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObjects(vectorGroup.children, true);
       for (const hit of hits) {
         let obj = hit.object;
         while (obj && !obj.userData.point) obj = obj.parent;
         if (obj && obj.userData.point) {
-          const p = obj.userData.point;
-          focusOnPoint(new THREE.Vector3(p.x, p.y, p.z));
-          if (p.meta && p.meta.nearest_words) {
-            displayResultCard(p.word, p.meta.closest_word, p.meta.closest_similarity, p.meta.nearest_words);
-          }
+          selectPoint(obj.userData.point);
           return;
         }
       }
@@ -629,9 +1521,8 @@
       data.points.forEach(addVector);
       if (data.links) addLinks(data.links);
       renderWordList(data.points);
-      if (data.vocab_size) {
-        document.getElementById("badge-dim").textContent = `2560-dim · ${data.vocab_size} vocab`;
-      }
+      updateTelemetry(data);
+      requestRender();
       return data;
     }
 
@@ -643,7 +1534,7 @@
           setStatus(`Restored ${data.points.length} active vectors from session.`);
         }
       } catch (_) {
-        // Ignore if server is still warming up
+        requestRender();
       }
     }
 
@@ -651,7 +1542,7 @@
       const btn = document.getElementById("plot-btn");
       const excludeInputs = document.getElementById("exclude-inputs-embed").checked;
       btn.disabled = true;
-      setStatus(`Processing "${word}" … (building/loading model if first call)`);
+      setStatus(`Encoding "${word}" in ℝ²⁵⁶⁰ ...`);
       try {
         const res = await fetch("/api/embed", {
           method: "POST",
@@ -661,14 +1552,14 @@
         const data = await handleApiResponse(res);
         if (data.expression) {
           const exp = data.expression;
-          displayResultCard(exp.expression, exp.closest_word, exp.closest_similarity, exp.nearest_words, "Expression Result");
-          setStatus(`Computed expression: "${exp.expression}" → Closest: "${exp.closest_word}"`);
+          displayResultCard(exp.expression, exp.closest_word, exp.closest_similarity, exp.nearest_words, "Algebraic Result");
+          setStatus(`Expression "${exp.expression}" → "${exp.closest_word}" (cos ${exp.closest_similarity})`);
         } else if (data.word_info) {
           const info = data.word_info;
-          displayResultCard(info.word, info.closest_word, info.closest_similarity, info.nearest_words, "Word Neighborhood");
-          setStatus(`${data.points.length} vectors active · "${info.word}" closest to "${info.closest_word}"`);
+          displayResultCard(info.word, info.closest_word, info.closest_similarity, info.nearest_words, "Concept Neighborhood");
+          setStatus(`Plotted "${info.word}" · nearest: "${info.closest_word}" (cos ${info.closest_similarity})`);
         } else {
-          setStatus(`${data.points.length} vectors active · source dimension: ${data.dimension}`);
+          setStatus(`${data.points.length} vectors active.`);
         }
       } catch (e) {
         setStatus(`Error: ${e.message}`);
@@ -682,7 +1573,7 @@
       const plotComponents = document.getElementById("plot-components-toggle").checked;
       const excludeInputs = document.getElementById("exclude-inputs-transform").checked;
       btn.disabled = true;
-      setStatus(`Evaluating ${base} + (${target} - ${source}) …`);
+      setStatus(`Computing ${base} + (${target} - ${source}) ...`);
       try {
         const res = await fetch("/api/transform", {
           method: "POST",
@@ -698,7 +1589,7 @@
         const data = await handleApiResponse(res);
         const trans = data.transformation;
         displayResultCard(trans.full_expr, trans.closest_word, trans.closest_similarity, trans.nearest_words, "Transformation Result");
-        setStatus(`Transformation complete: ${trans.full_expr} → Closest: "${trans.closest_word}"`);
+        setStatus(`${trans.full_expr} → "${trans.closest_word}" (cos ${trans.closest_similarity})`);
       } catch (e) {
         setStatus(`Error: ${e.message}`);
       } finally {
@@ -709,7 +1600,7 @@
     async function compareWords(wordA, wordB) {
       const btn = document.getElementById("sim-btn");
       btn.disabled = true;
-      setStatus(`Comparing "${wordA}" ↔ "${wordB}" …`);
+      setStatus(`Measuring "${wordA}" ↔ "${wordB}" ...`);
       try {
         const res = await fetch("/api/similarity", {
           method: "POST",
@@ -723,10 +1614,10 @@
           `${sim.word_a} · ${sim.word_b}`,
           sim.similarity,
           [{ word: `${sim.word_a} ↔ ${sim.word_b}`, similarity: sim.similarity }],
-          "Pairwise Cosine Similarity",
-          "📐 Cosine Sim"
+          "Pairwise Metric",
+          "Pair"
         );
-        setStatus(`Cosine similarity ("${sim.word_a}", "${sim.word_b}") = ${sim.similarity.toFixed(4)}`);
+        setStatus(`cos("${sim.word_a}", "${sim.word_b}") = ${sim.similarity.toFixed(4)} (θ = ${cosToDegrees(sim.similarity)}°)`);
       } catch (e) {
         setStatus(`Error: ${e.message}`);
       } finally {
@@ -748,7 +1639,7 @@
       }
     }
 
-    // Tabs logic
+    // View-Transition-enhanced Tabs
     const tabEmbedBtn = document.getElementById("tab-embed-btn");
     const tabTransformBtn = document.getElementById("tab-transform-btn");
     const tabSimBtn = document.getElementById("tab-sim-btn");
@@ -757,13 +1648,30 @@
     const paneSim = document.getElementById("pane-sim");
 
     function activateTab(activeBtn, activePane) {
-      [tabEmbedBtn, tabTransformBtn, tabSimBtn].forEach((b) => b.classList.toggle("active", b === activeBtn));
-      [paneEmbed, paneTransform, paneSim].forEach((p) => p.classList.toggle("active", p === activePane));
+      const switchFn = () => {
+        [tabEmbedBtn, tabTransformBtn, tabSimBtn].forEach((b) => {
+          const isAct = b === activeBtn;
+          b.classList.toggle("active", isAct);
+          b.setAttribute("aria-selected", String(isAct));
+        });
+        [paneEmbed, paneTransform, paneSim].forEach((p) => p.classList.toggle("active", p === activePane));
+      };
+      if (document.startViewTransition) document.startViewTransition(switchFn);
+      else switchFn();
     }
 
     tabEmbedBtn.addEventListener("click", () => activateTab(tabEmbedBtn, paneEmbed));
     tabTransformBtn.addEventListener("click", () => activateTab(tabTransformBtn, paneTransform));
     tabSimBtn.addEventListener("click", () => activateTab(tabSimBtn, paneSim));
+
+    // Swap Target <-> Source button
+    document.getElementById("swap-axis-btn").addEventListener("click", () => {
+      const targetEl = document.getElementById("trans-target");
+      const sourceEl = document.getElementById("trans-source");
+      const tmp = targetEl.value;
+      targetEl.value = sourceEl.value;
+      sourceEl.value = tmp;
+    });
 
     // Preset select handler
     document.getElementById("preset-select").addEventListener("change", (e) => {
@@ -791,7 +1699,7 @@
       const source = document.getElementById("trans-source").value.trim();
       const target = document.getElementById("trans-target").value.trim();
       if (!base || !source || !target) {
-        setStatus("Please fill in Base, Target, and Source words.");
+        setStatus("Specify Base, Target (+), and Source (−) concepts.");
         return;
       }
       applyTransformation(base, source, target);
@@ -802,21 +1710,17 @@
       const wordA = document.getElementById("sim-word-a").value.trim();
       const wordB = document.getElementById("sim-word-b").value.trim();
       if (!wordA || !wordB) {
-        setStatus("Please fill in both Concept A and Concept B.");
+        setStatus("Specify both Vector A and Vector B.");
         return;
       }
       compareWords(wordA, wordB);
     });
 
-    // Quick Expression Chips
+    // Quick Chips
     document.querySelectorAll(".chip[data-expr]").forEach((chip) => {
-      chip.addEventListener("click", () => {
-        const expr = chip.getAttribute("data-expr");
-        plotWord(expr);
-      });
+      chip.addEventListener("click", () => plotWord(chip.getAttribute("data-expr")));
     });
 
-    // Quick Similarity Chips
     document.querySelectorAll(".sim-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
         const [wordA, wordB] = chip.getAttribute("data-pair").split(",");
@@ -826,14 +1730,26 @@
       });
     });
 
+    // Matrix Dialog Controls
+    const matrixDialog = document.getElementById("matrix-dialog");
+    function openMatrixModal() {
+      renderMatrixTable();
+      matrixDialog.showModal();
+    }
+    document.getElementById("open-matrix-btn").addEventListener("click", openMatrixModal);
+    document.getElementById("hud-matrix-btn").addEventListener("click", openMatrixModal);
+    document.getElementById("close-matrix-btn").addEventListener("click", () => matrixDialog.close());
+    matrixDialog.addEventListener("click", (e) => {
+      if (e.target === matrixDialog) matrixDialog.close();
+    });
+
     // Scene Controls
     document.getElementById("reset-btn").addEventListener("click", async () => {
-      setStatus("Clearing scene …");
-      await fetch("/api/reset", { method: "POST" });
-      clearSceneElements();
-      renderWordList([]);
+      setStatus("Clearing scene ...");
+      const res = await fetch("/api/reset", { method: "POST" });
+      await handleApiResponse(res);
       document.getElementById("result-card").style.display = "none";
-      setStatus("Scene cleared. Ready for next query.");
+      setStatus("Scene cleared.");
     });
 
     document.getElementById("reset-view-btn").addEventListener("click", () => {
@@ -844,24 +1760,44 @@
 
     document.getElementById("autorotate-toggle").addEventListener("change", (e) => {
       controls.autoRotate = e.target.checked;
+      requestRender();
+    });
+
+    // Global Keyboard Shortcuts
+    window.addEventListener("keydown", (e) => {
+      const tag = document.activeElement ? document.activeElement.tagName : "";
+      const inInput = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
+      if (e.key === "/" && !inInput) {
+        e.preventDefault();
+        document.getElementById("word-input").focus();
+      } else if ((e.key === "r" || e.key === "R") && !inInput) {
+        e.preventDefault();
+        resetView();
+      } else if ((e.key === "m" || e.key === "M") && !inInput) {
+        e.preventDefault();
+        if (matrixDialog.open) matrixDialog.close();
+        else openMatrixModal();
+      } else if (e.key === " " && !inInput && !matrixDialog.open) {
+        e.preventDefault();
+        const toggle = document.getElementById("autorotate-toggle");
+        toggle.checked = !toggle.checked;
+        controls.autoRotate = toggle.checked;
+        requestRender();
+      }
     });
 
     window.addEventListener("resize", () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const w = getViewportWidth();
+      const h = getViewportHeight();
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(w, h);
+      labelRenderer.setSize(w, h);
+      requestRender();
     });
 
-    function animate() {
-      requestAnimationFrame(animate);
-      updateCameraAnim();
-      controls.update();
-      renderer.render(scene, camera);
-      labelRenderer.render(scene, camera);
-    }
+    requestRender();
     loadInitialState();
-    animate();
   </script>
 </body>
 </html>
