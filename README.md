@@ -4,11 +4,11 @@ Interactive 2560-dimensional semantic embedding engine and 3D Three.js projectio
 
 ## Learning Objectives
 
-- **High-Dimensional Representation**: Understand how transformer embedding models map discrete words and phrases onto the unit hypersphere in $\mathbb{R}^{2560}$.
-- **Linear Semantic Structure**: Observe how relational directions (gender, royalty, geography, tense) emerge as linear displacement vectors $\Delta = \vec{v}_{\text{target}} - \vec{v}_{\text{source}}$.
-- **Analogical Reasoning via Vector Arithmetic**: Compute transformations $\vec{v}_{\text{result}} = \text{normalize}(\vec{v}_{\text{base}} + \Delta)$ (e.g., `uncle + (woman - man) -> aunt`) and measure cosine similarity ($\cos \theta$) and angular distance ($\theta^\circ$).
-- **Fast Vector Retrieval**: Implement sub-millisecond nearest-neighbor search over a cached vocabulary matrix via BLAS dot products ($\mathbf{M}_{\text{vocab}} \cdot \vec{v}_q$).
-- **Dimensionality Reduction & Fidelity**: Project $\mathbb{R}^{2560}$ vectors into $\mathbb{R}^3$ using Principal Component Analysis (PCA) while tracking explained variance across principal axes (`PC1`, `PC2`, `PC3`).
+- **High-Dimensional Representation**: Understand how transformer embedding models map discrete words and phrases onto the unit hypersphere in `ℝ²⁵⁶⁰`.
+- **Linear Semantic Structure**: Observe how relational directions (gender, royalty, geography, tense) emerge as linear displacement vectors `Δ = v_target − v_source`.
+- **Analogical Reasoning via Vector Arithmetic**: Compute transformations `v_result = normalize(v_base + Δ)` (e.g., `uncle + (woman - man) → aunt`) and measure cosine similarity (`cos θ`) and angular distance (`θ°`).
+- **Fast Vector Retrieval**: Implement sub-millisecond nearest-neighbor search over a cached vocabulary matrix via BLAS dot products (`M_vocab · v_query`).
+- **Dimensionality Reduction & Fidelity**: Project `ℝ²⁵⁶⁰` vectors into `ℝ³` using Principal Component Analysis (PCA) while tracking explained variance across principal axes (`PC1`, `PC2`, `PC3`).
 
 ## Features
 
@@ -17,14 +17,14 @@ Interactive 2560-dimensional semantic embedding engine and 3D Three.js projectio
 2. **Vector Arithmetic Expressions**:
    - Evaluates multi-term additions and subtractions such as `"king - man + woman"`, `"woman - man"`, and `"paris - france + italy"`.
 3. **Analogical Transformation Function**:
-   - Computes $\vec{v}_{\text{result}} = \text{normalize}(\vec{v}_{\text{base}} + (\vec{v}_{\text{target}} - \vec{v}_{\text{source}}))$, e.g. `uncle + (woman - man) -> aunt` (cosine similarity `0.8201`).
+   - Computes `v_result = normalize(v_base + (v_target − v_source))`, e.g. `uncle + (woman - man) → aunt` (cosine similarity `0.8201`).
 4. **Sub-Millisecond Vocabulary Nearest-Neighbor Search** ([`vocab_manager.py`](./vocab_manager.py)):
    - Pre-indexes 2,500 curated benchmark and common English words in `vocab_cache.npz` for `< 1.5 ms` BLAS dot-product lookup.
    - Dynamically indexes any custom word entered during a session.
 5. **Precision 3D Web Instrument** ([`server.py`](./server.py), [`static/index.html`](./static/index.html)):
    - **01 EXPR**: Plot individual concepts or arbitrary linear combinations.
    - **02 TRANSFORM**: Dedicated `Base (v₀)`, `Target (+)`, and `Source (−)` workbench with 1-click axis inversion (`Swap ↔`), benchmark presets, and basis vector toggles.
-   - **03 COMPARE & Matrix (`[M]`)**: Measure exact $\mathbb{R}^{2560}$ pairwise cosine similarity and angular separation ($\theta^\circ$), or open the full $N \times N$ similarity heatmap modal.
+   - **03 COMPARE & Matrix (`[M]`)**: Measure exact `ℝ²⁵⁶⁰` pairwise cosine similarity and angular separation (`θ°`), or open the full `N × N` similarity heatmap modal.
    - **Zero-Idle WebGL Engine**: Demand-driven render loop (`0% GPU` when stationary), explicit WebGL geometry/material disposal, and live 3D PCA explained-variance telemetry.
 
 ## Quickstart
