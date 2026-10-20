@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Weights and Large Data
+models/
+vocab_cache.npz
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+.claude/

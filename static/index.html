@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Embedding Space & Transformation Studio</title>
+<style>
+  :root {
+    color-scheme: dark;
+    accent-color: var(--primary);
+    --bg: #0b0d12;
+    --sidebar-bg: rgba(15, 18, 26, 0.88);
+    --border: rgba(255, 255, 255, 0.08);
+    --primary: #3b82f6;
+    --primary-hover: #60a5fa;
+    --accent-result: #f59e0b;
+    --accent-delta: #c084fc;
+    --accent-nearest: #10b981;
+    --accent-base: #38bdf8;
+    --accent-source: #f43f5e;
+    --accent-target: #34d399;
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: #e6e8ee;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+  #sidebar {
+    position: fixed; top: 0; left: 0; width: 340px; height: 100%;
+    box-sizing: border-box; padding: 18px;
+    background: var(--sidebar-bg); backdrop-filter: blur(12px);
+    border-right: 1px solid var(--border);
+    z-index: 10; display: flex; flex-direction: column; gap: 12px;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  .header-row { display: flex; justify-content: space-between; align-items: baseline; }
+  h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: 0.2px; color: #fff; }
+  .badge-dim { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+  .sub { font-size: 11px; color: #94a3b8; margin: 0; line-height: 1.4; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 3px; border-radius: 8px; border: 1px solid var(--border); }
+  .tab-btn {
+    flex: 1; padding: 6px 10px; border-radius: 6px; border: none; background: transparent;
+    color: #94a3b8; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .tab-btn.active { background: #252a38; color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+
+  /* Tab content */
+  .tab-pane { display: none; flex-direction: column; gap: 10px; }
+  .tab-pane.active { display: flex; }
+
+  form { display: flex; flex-direction: column; gap: 8px; }
+  .input-row { display: flex; gap: 6px; }
+  input[type=text] {
+    flex: 1; padding: 8px 10px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.12); background: #151923;
+    color: #e6e8ee; font-size: 13px; outline: none; transition: border-color 0.15s;
+  }
+  input[type=text]:focus { border-color: #60a5fa; }
+  .field-label { font-size: 11px; font-weight: 600; color: #cbd5e1; margin-bottom: 2px; }
+  .field-desc { font-size: 10px; color: #64748b; margin-top: -2px; }
+
+  button.action-btn {
+    padding: 8px 12px; border-radius: 6px; border: none;
+    background: var(--primary); color: white; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s, opacity 0.15s;
+  }
+  button.action-btn:hover { background: var(--primary-hover); }
+  button.action-btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* Chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    font-size: 10.5px; padding: 3px 7px; border-radius: 4px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+    color: #cbd5e1; cursor: pointer; transition: all 0.15s;
+  }
+  .chip:hover { background: rgba(59, 130, 246, 0.18); border-color: #3b82f6; color: #93c5fd; }
+
+  /* Presets selector */
+  select.preset-select {
+    width: 100%; padding: 6px 8px; border-radius: 6px;
+    background: #151923; border: 1px solid rgba(255,255,255,0.12);
+    color: #cbd5e1; font-size: 11px; outline: none;
+  }
+
+  .row-controls { display: flex; gap: 6px; }
+  .row-controls button {
+    flex: 1; padding: 6px 10px; border-radius: 6px;
+    background: transparent; border: 1px solid rgba(255,255,255,0.14);
+    color: #94a3b8; font-size: 11px; font-weight: 500; cursor: pointer;
+  }
+  .row-controls button:hover { background: rgba(255,255,255,0.06); color: #fff; }
+
+  label.toggle {
+    display: flex; align-items: center; gap: 6px; font-size: 11px;
+    color: #94a3b8; cursor: pointer; user-select: none;
+  }
+
+  /* Result Card */
+  #result-card {
+    display: none; flex-direction: column; gap: 6px; padding: 10px;
+    background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: 8px;
+  }
+  .result-header { font-size: 11px; color: #f59e0b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .result-formula { font-size: 12px; font-weight: 600; color: #fef08a; font-family: monospace; }
+  .closest-pill {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(16, 185, 129, 0.35); color: #a7f3d0; font-size: 12px; font-weight: 700;
+  }
+  .neighbors-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .neighbor-item { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+  .neighbor-text { display: flex; justify-content: space-between; color: #cbd5e1; }
+  .sim-bar-wrap { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+  .sim-bar-fill { height: 100%; background: #10b981; border-radius: 2px; }
+
+  #status { font-size: 11px; color: #94a3b8; min-height: 24px; line-height: 1.3; }
+
+  /* Plotted Words List */
+  #words-container { flex: 1; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 80px; }
+  #words { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  #words li {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; padding: 6px 8px; border-radius: 5px;
+    background: rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s;
+  }
+  #words li:hover { background: rgba(255,255,255,0.08); }
+  .word-left { display: flex; align-items: center; gap: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .word-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .type-tag { font-size: 9px; padding: 1px 4px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
+  .remove-btn {
+    border: none; background: transparent; color: #64748b; font-size: 13px;
+    line-height: 1; padding: 2px 5px; border-radius: 4px; cursor: pointer;
+  }
+  .remove-btn:hover { background: rgba(244, 63, 94, 0.2); color: #f43f5e; }
+
+  #hint { font-size: 10px; color: #64748b; line-height: 1.3; }
+
+  /* 3D Canvas elements */
+  #canvas-wrap { position: fixed; inset: 0; cursor: grab; }
+  #canvas-wrap.dragging { cursor: grabbing; }
+  .label {
+    font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 5px;
+    background: rgba(8, 10, 14, 0.82); white-space: nowrap;
+    transform: translateY(-16px);
+    cursor: pointer; pointer-events: auto; transition: transform 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .label:hover { background: rgba(8, 10, 14, 0.98); transform: translateY(-16px) scale(1.1); }
+  .label-link {
+    font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+    background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.15);
+    color: #94a3b8; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div id="sidebar">
+    <div class="header-row">
+      <h1>Embedding Space</h1>
+      <span class="badge-dim" id="badge-dim">2560-dim → 3D</span>
+    </div>
+    <p class="sub">Qwen3-Embedding-4B vector arithmetic & semantic transformation visualizer.</p>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-embed-btn">Expression</button>
+      <button class="tab-btn" id="tab-transform-btn">Transform</button>
+      <button class="tab-btn" id="tab-sim-btn">Compare</button>
+    </div>
+
+    <!-- Tab 1: Single Word & Arithmetic Expressions -->
+    <div class="tab-pane active" id="pane-embed">
+      <form id="form-embed">
+        <div class="input-row">
+          <input id="word-input" type="text" placeholder="e.g. king - man + woman" autocomplete="off" autofocus />
+          <button type="submit" class="action-btn" id="plot-btn">Plot</button>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="exclude-inputs-embed" checked />
+          Exclude input terms from nearest match
+        </label>
+      </form>
+      <div class="chips">
+        <span class="chip" data-expr="king - man + woman">👑 king - man + woman</span>
+        <span class="chip" data-expr="woman - man">⚡ woman - man</span>
+        <span class="chip" data-expr="paris - france + italy">🏛 paris - france + italy</span>
+        <span class="chip" data-expr="doctor - man + woman">🩺 doctor - man + woman</span>
+      </div>
+    </div>
+
+    <!-- Tab 2: Dedicated Semantic Transformation Studio -->
+    <div class="tab-pane" id="pane-transform">
+      <form id="form-transform">
+        <div>
+          <div class="field-label">Preset Analogies</div>
+          <select class="preset-select" id="preset-select">
+            <option value="">-- Choose a benchmark analogy --</option>
+            <option value="uncle,man,woman">uncle + (woman - man) → aunt</option>
+            <option value="king,man,woman">king + (woman - man) → queen</option>
+            <option value="brother,boy,girl">brother + (girl - boy) → sister</option>
+            <option value="paris,france,italy">paris + (italy - france) → rome</option>
+            <option value="good,best,worst">good + (worst - best) → bad</option>
+            <option value="puppy,dog,cat">puppy + (cat - dog) → kitten</option>
+          </select>
+        </div>
+
+        <div>
+          <div class="field-label">1. Base Vector (Starting concept)</div>
+          <input id="trans-base" type="text" placeholder="e.g. uncle" autocomplete="off" />
+        </div>
+
+        <div style="display: flex; gap: 6px;">
+          <div style="flex: 1;">
+            <div class="field-label">2. Target (+)</div>
+            <input id="trans-target" type="text" placeholder="e.g. woman" autocomplete="off" />
+          </div>
+          <div style="flex: 1;">
+            <div class="field-label">3. Source (-)</div>
+            <input id="trans-source" type="text" placeholder="e.g. man" autocomplete="off" />
+          </div>
+        </div>
+        <div class="field-desc">Δ = Target - Source (semantic shift direction)</div>
+
+        <label class="toggle">
+          <input type="checkbox" id="plot-components-toggle" checked />
+          Plot component vectors &amp; helper lines
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="exclude-inputs-transform" checked />
+          Exclude input terms from nearest match
+        </label>
+
+        <button type="submit" class="action-btn" id="trans-btn">Apply Transformation &amp; Plot</button>
+      </form>
+    </div>
+
+    <!-- Tab 3: Pairwise Cosine Similarity Comparison -->
+    <div class="tab-pane" id="pane-sim">
+      <form id="form-sim">
+        <div>
+          <div class="field-label">Concept A</div>
+          <input id="sim-word-a" type="text" placeholder="e.g. king" autocomplete="off" />
+        </div>
+        <div>
+          <div class="field-label">Concept B</div>
+          <input id="sim-word-b" type="text" placeholder="e.g. queen" autocomplete="off" />
+        </div>
+        <button type="submit" class="action-btn" id="sim-btn">Compare &amp; Link in 3D</button>
+      </form>
+      <div class="chips">
+        <span class="chip sim-chip" data-pair="king,queen">👑 king ↔ queen</span>
+        <span class="chip sim-chip" data-pair="ocean,sea">🌊 ocean ↔ sea</span>
+        <span class="chip sim-chip" data-pair="good,bad">⚖️ good ↔ bad</span>
+        <span class="chip sim-chip" data-pair="cat,dog">🐾 cat ↔ dog</span>
+      </div>
+    </div>
+
+    <!-- Active Result / Closest Word Card -->
+    <div id="result-card">
+      <div class="result-header" id="card-header">Semantic Neighborhood</div>
+      <div class="result-formula" id="card-formula">uncle + (woman - man)</div>
+      <div class="closest-pill">
+        <span id="card-closest-label">🎯 Closest Word: <span id="card-closest-word">aunt</span></span>
+        <span id="card-closest-sim">0.820</span>
+      </div>
+      <div class="neighbors-list" id="card-neighbors"></div>
+    </div>
+
+    <!-- View & Scene Controls -->
+    <div class="row-controls">
+      <button id="reset-view-btn" type="button">Reset camera</button>
+      <button id="reset-btn" type="button">Clear scene</button>
+    </div>
+
+    <label class="toggle">
+      <input type="checkbox" id="autorotate-toggle" />
+      Auto-rotate scene
+    </label>
+
+    <div id="status">Ready. Enter a word or transformation.</div>
+
+    <!-- Active Plotted Items -->
+    <div class="field-label">Active Vectors in Scene</div>
+    <div id="words-container">
+      <ul id="words"></ul>
+    </div>
+
+    <div id="hint">Drag: rotate · Scroll: zoom · Right-drag: pan · Click any word or line to focus camera</div>
+  </div>
+
+  <div id="canvas-wrap"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
+
+    const wrap = document.getElementById("canvas-wrap");
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0d12);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(9, 7, 9);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    wrap.appendChild(renderer.domElement);
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = "absolute";
+    labelRenderer.domElement.style.top = "0";
+    labelRenderer.domElement.style.left = "0";
+    labelRenderer.domElement.style.pointerEvents = "none";
+    wrap.appendChild(labelRenderer.domElement);
+
+    const DEFAULT_CAM_POS = new THREE.Vector3(9, 7, 9);
+
+    const controls = new OrbitControls(camera, labelRenderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.enableZoom = true;
+    controls.enablePan = true;
+    controls.enableRotate = true;
+    controls.screenSpacePanning = true;
+    controls.zoomSpeed = 1.15;
+    controls.panSpeed = 0.9;
+    controls.rotateSpeed = 0.9;
+    controls.minDistance = 1.5;
+    controls.maxDistance = 45;
+    controls.autoRotateSpeed = 1.1;
+    controls.listenToKeyEvents(window);
+
+    controls.addEventListener("start", () => wrap.classList.add("dragging"));
+    controls.addEventListener("end", () => wrap.classList.remove("dragging"));
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    scene.add(new THREE.GridHelper(14, 14, 0x22262f, 0x1a1d24));
+    scene.add(new THREE.AxesHelper(6));
+
+    const vectorGroup = new THREE.Group();
+    scene.add(vectorGroup);
+
+    const lineGroup = new THREE.Group();
+    scene.add(lineGroup);
+
+    function clearSceneElements() {
+      while (vectorGroup.children.length) {
+        vectorGroup.remove(vectorGroup.children[0]);
+      }
+      while (lineGroup.children.length) {
+        lineGroup.remove(lineGroup.children[0]);
+      }
+    }
+
+    function addVector(point) {
+      const dir = new THREE.Vector3(point.x, point.y, point.z);
+      const length = dir.length();
+      if (length < 0.0001) return;
+      const normDir = dir.clone().normalize();
+      const color = new THREE.Color(point.color);
+
+      const isResult = point.type === "result";
+      const isNearest = point.type === "nearest";
+      const isDelta = point.type === "delta";
+
+      // Vector Arrow
+      const arrow = new THREE.ArrowHelper(
+        normDir,
+        new THREE.Vector3(0, 0, 0),
+        length,
+        color,
+        isResult ? Math.min(0.7, length * 0.25) : Math.min(0.5, length * 0.2),
+        isResult ? Math.min(0.4, length * 0.18) : Math.min(0.3, length * 0.15)
+      );
+      arrow.userData.point = point;
+      vectorGroup.add(arrow);
+
+      // Sphere tip marker
+      const sphereRadius = isResult ? 0.16 : (isNearest ? 0.14 : 0.1);
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(sphereRadius, 16, 16),
+        new THREE.MeshBasicMaterial({ color })
+      );
+      dot.position.copy(dir);
+      dot.userData.point = point;
+      vectorGroup.add(dot);
+
+      // Label DOM Element
+      const div = document.createElement("div");
+      div.className = "label";
+      let prefix = "";
+      if (isResult) prefix = "⭐ ";
+      else if (isNearest) prefix = "🎯 ";
+      else if (isDelta) prefix = "Δ ";
+
+      div.textContent = `${prefix}${point.word}`;
+      div.style.color = point.color;
+      div.style.border = `1px solid ${point.color}66`;
+      if (isResult) {
+        div.style.boxShadow = `0 0 12px ${point.color}44`;
+        div.style.fontWeight = "700";
+      }
+      div.addEventListener("click", () => focusOnPoint(dir));
+      const labelObj = new CSS2DObject(div);
+      labelObj.position.copy(dir);
+      vectorGroup.add(labelObj);
+    }
+
+    function addLinks(links) {
+      links.forEach((link) => {
+        const from = new THREE.Vector3(...link.from_coord);
+        const to = new THREE.Vector3(...link.to_coord);
+
+        const geom = new THREE.BufferGeometry().setFromPoints([from, to]);
+        const color = new THREE.Color(link.color || 0x94a3b8);
+
+        let lineMat;
+        if (link.style === "dotted" || link.style === "dashed") {
+          lineMat = new THREE.LineDashedMaterial({
+            color,
+            dashSize: 0.2,
+            gapSize: 0.12,
+            linewidth: 1.5,
+          });
+        } else {
+          lineMat = new THREE.LineBasicMaterial({ color, linewidth: 1.2 });
+        }
+
+        const line = new THREE.Line(geom, lineMat);
+        line.computeLineDistances();
+        lineGroup.add(line);
+
+        // Optional midpoint label
+        if (link.label) {
+          const mid = from.clone().lerp(to, 0.5);
+          const div = document.createElement("div");
+          div.className = "label-link";
+          div.textContent = link.label;
+          div.style.color = link.color;
+          const labelObj = new CSS2DObject(div);
+          labelObj.position.copy(mid);
+          lineGroup.add(labelObj);
+        }
+      });
+    }
+
+    function renderWordList(points) {
+      const ul = document.getElementById("words");
+      ul.innerHTML = "";
+      points.forEach((p) => {
+        const li = document.createElement("li");
+
+        const left = document.createElement("div");
+        left.className = "word-left";
+
+        const sw = document.createElement("span");
+        sw.className = "swatch";
+        sw.style.background = p.color;
+
+        const label = document.createElement("span");
+        label.textContent = p.word;
+
+        left.appendChild(sw);
+        left.appendChild(label);
+        li.appendChild(left);
+
+        const right = document.createElement("div");
+        right.className = "word-right";
+
+        if (p.type && p.type !== "word") {
+          const tag = document.createElement("span");
+          tag.className = "type-tag";
+          tag.textContent = p.type;
+          tag.style.background = `${p.color}33`;
+          tag.style.color = p.color;
+          right.appendChild(tag);
+        }
+
+        const rmBtn = document.createElement("button");
+        rmBtn.type = "button";
+        rmBtn.className = "remove-btn";
+        rmBtn.title = `Remove "${p.word}"`;
+        rmBtn.textContent = "×";
+        rmBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          removeWord(p.word);
+        });
+        right.appendChild(rmBtn);
+        li.appendChild(right);
+
+        li.addEventListener("click", () => {
+          focusOnPoint(new THREE.Vector3(p.x, p.y, p.z));
+          if (p.meta && p.meta.nearest_words) {
+            displayResultCard(p.word, p.meta.closest_word, p.meta.closest_similarity, p.meta.nearest_words);
+          }
+        });
+        ul.appendChild(li);
+      });
+    }
+
+    function displayResultCard(formula, closestWord, similarity, nearestWords, headerText = "Semantic Neighborhood", labelPrefix = "🎯 Closest Word") {
+      const card = document.getElementById("result-card");
+      document.getElementById("card-header").textContent = headerText;
+      document.getElementById("card-formula").textContent = formula;
+      document.getElementById("card-closest-label").innerHTML = `${labelPrefix}: <span id="card-closest-word">${closestWord || "None"}</span>`;
+      document.getElementById("card-closest-sim").textContent = typeof similarity === "number" ? similarity.toFixed(4) : "";
+
+      const neighborsContainer = document.getElementById("card-neighbors");
+      neighborsContainer.innerHTML = "";
+
+      (nearestWords || []).forEach((item) => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "neighbor-item";
+
+        const textDiv = document.createElement("div");
+        textDiv.className = "neighbor-text";
+        textDiv.innerHTML = `<span>${item.word}</span><span>${item.similarity.toFixed(4)}</span>`;
+
+        const barWrap = document.createElement("div");
+        barWrap.className = "sim-bar-wrap";
+
+        const barFill = document.createElement("div");
+        barFill.className = "sim-bar-fill";
+        const pct = Math.max(0, Math.min(100, (item.similarity) * 100));
+        barFill.style.width = `${pct}%`;
+
+        barWrap.appendChild(barFill);
+        itemDiv.appendChild(textDiv);
+        itemDiv.appendChild(barWrap);
+        neighborsContainer.appendChild(itemDiv);
+      });
+
+      card.style.display = "flex";
+    }
+
+    // Camera transitions
+    let camAnim = null;
+    function animateCameraTo(toTarget, toCamPos, duration = 650) {
+      camAnim = {
+        fromTarget: controls.target.clone(),
+        toTarget: toTarget.clone(),
+        fromCamPos: camera.position.clone(),
+        toCamPos: toCamPos.clone(),
+        start: performance.now(),
+        duration,
+      };
+    }
+
+    function focusOnPoint(vec3) {
+      const delta = vec3.clone().sub(controls.target);
+      animateCameraTo(vec3, camera.position.clone().add(delta));
+    }
+
+    function resetView() {
+      animateCameraTo(new THREE.Vector3(0, 0, 0), DEFAULT_CAM_POS);
+    }
+
+    function updateCameraAnim() {
+      if (!camAnim) return;
+      const t = Math.min(1, (performance.now() - camAnim.start) / camAnim.duration);
+      const ease = 1 - Math.pow(1 - t, 3);
+      controls.target.lerpVectors(camAnim.fromTarget, camAnim.toTarget, ease);
+      camera.position.lerpVectors(camAnim.fromCamPos, camAnim.toCamPos, ease);
+      if (t >= 1) camAnim = null;
+    }
+
+    // Raycaster for 3D click selection
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerDownAt = null;
+
+    renderer.domElement.addEventListener("pointerdown", (e) => {
+      pointerDownAt = { x: e.clientX, y: e.clientY };
+    });
+
+    renderer.domElement.addEventListener("pointerup", (e) => {
+      if (!pointerDownAt) return;
+      const moved = Math.hypot(e.clientX - pointerDownAt.x, e.clientY - pointerDownAt.y);
+      pointerDownAt = null;
+      if (moved > 5) return;
+
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(vectorGroup.children, true);
+      for (const hit of hits) {
+        let obj = hit.object;
+        while (obj && !obj.userData.point) obj = obj.parent;
+        if (obj && obj.userData.point) {
+          const p = obj.userData.point;
+          focusOnPoint(new THREE.Vector3(p.x, p.y, p.z));
+          if (p.meta && p.meta.nearest_words) {
+            displayResultCard(p.word, p.meta.closest_word, p.meta.closest_similarity, p.meta.nearest_words);
+          }
+          return;
+        }
+      }
+    });
+
+    function setStatus(text) {
+      document.getElementById("status").textContent = text;
+    }
+
+    // API calls
+    async function handleApiResponse(res) {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed (${res.status})`);
+      }
+      const data = await res.json();
+      clearSceneElements();
+      data.points.forEach(addVector);
+      if (data.links) addLinks(data.links);
+      renderWordList(data.points);
+      if (data.vocab_size) {
+        document.getElementById("badge-dim").textContent = `2560-dim · ${data.vocab_size} vocab`;
+      }
+      return data;
+    }
+
+    async function loadInitialState() {
+      try {
+        const res = await fetch("/api/state");
+        const data = await handleApiResponse(res);
+        if (data.points && data.points.length > 0) {
+          setStatus(`Restored ${data.points.length} active vectors from session.`);
+        }
+      } catch (_) {
+        // Ignore if server is still warming up
+      }
+    }
+
+    async function plotWord(word) {
+      const btn = document.getElementById("plot-btn");
+      const excludeInputs = document.getElementById("exclude-inputs-embed").checked;
+      btn.disabled = true;
+      setStatus(`Processing "${word}" … (building/loading model if first call)`);
+      try {
+        const res = await fetch("/api/embed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ word, exclude_inputs: excludeInputs }),
+        });
+        const data = await handleApiResponse(res);
+        if (data.expression) {
+          const exp = data.expression;
+          displayResultCard(exp.expression, exp.closest_word, exp.closest_similarity, exp.nearest_words, "Expression Result");
+          setStatus(`Computed expression: "${exp.expression}" → Closest: "${exp.closest_word}"`);
+        } else if (data.word_info) {
+          const info = data.word_info;
+          displayResultCard(info.word, info.closest_word, info.closest_similarity, info.nearest_words, "Word Neighborhood");
+          setStatus(`${data.points.length} vectors active · "${info.word}" closest to "${info.closest_word}"`);
+        } else {
+          setStatus(`${data.points.length} vectors active · source dimension: ${data.dimension}`);
+        }
+      } catch (e) {
+        setStatus(`Error: ${e.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function applyTransformation(base, source, target) {
+      const btn = document.getElementById("trans-btn");
+      const plotComponents = document.getElementById("plot-components-toggle").checked;
+      const excludeInputs = document.getElementById("exclude-inputs-transform").checked;
+      btn.disabled = true;
+      setStatus(`Evaluating ${base} + (${target} - ${source}) …`);
+      try {
+        const res = await fetch("/api/transform", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base,
+            source,
+            target,
+            plot_components: plotComponents,
+            exclude_inputs: excludeInputs,
+          }),
+        });
+        const data = await handleApiResponse(res);
+        const trans = data.transformation;
+        displayResultCard(trans.full_expr, trans.closest_word, trans.closest_similarity, trans.nearest_words, "Transformation Result");
+        setStatus(`Transformation complete: ${trans.full_expr} → Closest: "${trans.closest_word}"`);
+      } catch (e) {
+        setStatus(`Error: ${e.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function compareWords(wordA, wordB) {
+      const btn = document.getElementById("sim-btn");
+      btn.disabled = true;
+      setStatus(`Comparing "${wordA}" ↔ "${wordB}" …`);
+      try {
+        const res = await fetch("/api/similarity", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ word_a: wordA, word_b: wordB }),
+        });
+        const data = await handleApiResponse(res);
+        const sim = data.similarity;
+        displayResultCard(
+          `${sim.word_a} ↔ ${sim.word_b}`,
+          `${sim.word_a} · ${sim.word_b}`,
+          sim.similarity,
+          [{ word: `${sim.word_a} ↔ ${sim.word_b}`, similarity: sim.similarity }],
+          "Pairwise Cosine Similarity",
+          "📐 Cosine Sim"
+        );
+        setStatus(`Cosine similarity ("${sim.word_a}", "${sim.word_b}") = ${sim.similarity.toFixed(4)}`);
+      } catch (e) {
+        setStatus(`Error: ${e.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function removeWord(word) {
+      try {
+        const res = await fetch("/api/remove", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ word }),
+        });
+        const data = await handleApiResponse(res);
+        setStatus(`Removed "${word}" · ${data.points.length} vectors active.`);
+      } catch (e) {
+        setStatus(`Error removing "${word}": ${e.message}`);
+      }
+    }
+
+    // Tabs logic
+    const tabEmbedBtn = document.getElementById("tab-embed-btn");
+    const tabTransformBtn = document.getElementById("tab-transform-btn");
+    const tabSimBtn = document.getElementById("tab-sim-btn");
+    const paneEmbed = document.getElementById("pane-embed");
+    const paneTransform = document.getElementById("pane-transform");
+    const paneSim = document.getElementById("pane-sim");
+
+    function activateTab(activeBtn, activePane) {
+      [tabEmbedBtn, tabTransformBtn, tabSimBtn].forEach((b) => b.classList.toggle("active", b === activeBtn));
+      [paneEmbed, paneTransform, paneSim].forEach((p) => p.classList.toggle("active", p === activePane));
+    }
+
+    tabEmbedBtn.addEventListener("click", () => activateTab(tabEmbedBtn, paneEmbed));
+    tabTransformBtn.addEventListener("click", () => activateTab(tabTransformBtn, paneTransform));
+    tabSimBtn.addEventListener("click", () => activateTab(tabSimBtn, paneSim));
+
+    // Preset select handler
+    document.getElementById("preset-select").addEventListener("change", (e) => {
+      const val = e.target.value;
+      if (!val) return;
+      const [base, source, target] = val.split(",");
+      document.getElementById("trans-base").value = base;
+      document.getElementById("trans-source").value = source;
+      document.getElementById("trans-target").value = target;
+    });
+
+    // Form Submissions
+    document.getElementById("form-embed").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = document.getElementById("word-input");
+      const word = input.value.trim();
+      if (!word) return;
+      plotWord(word);
+      input.value = "";
+    });
+
+    document.getElementById("form-transform").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const base = document.getElementById("trans-base").value.trim();
+      const source = document.getElementById("trans-source").value.trim();
+      const target = document.getElementById("trans-target").value.trim();
+      if (!base || !source || !target) {
+        setStatus("Please fill in Base, Target, and Source words.");
+        return;
+      }
+      applyTransformation(base, source, target);
+    });
+
+    document.getElementById("form-sim").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const wordA = document.getElementById("sim-word-a").value.trim();
+      const wordB = document.getElementById("sim-word-b").value.trim();
+      if (!wordA || !wordB) {
+        setStatus("Please fill in both Concept A and Concept B.");
+        return;
+      }
+      compareWords(wordA, wordB);
+    });
+
+    // Quick Expression Chips
+    document.querySelectorAll(".chip[data-expr]").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const expr = chip.getAttribute("data-expr");
+        plotWord(expr);
+      });
+    });
+
+    // Quick Similarity Chips
+    document.querySelectorAll(".sim-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const [wordA, wordB] = chip.getAttribute("data-pair").split(",");
+        document.getElementById("sim-word-a").value = wordA;
+        document.getElementById("sim-word-b").value = wordB;
+        compareWords(wordA, wordB);
+      });
+    });
+
+    // Scene Controls
+    document.getElementById("reset-btn").addEventListener("click", async () => {
+      setStatus("Clearing scene …");
+      await fetch("/api/reset", { method: "POST" });
+      clearSceneElements();
+      renderWordList([]);
+      document.getElementById("result-card").style.display = "none";
+      setStatus("Scene cleared. Ready for next query.");
+    });
+
+    document.getElementById("reset-view-btn").addEventListener("click", () => {
+      controls.autoRotate = false;
+      document.getElementById("autorotate-toggle").checked = false;
+      resetView();
+    });
+
+    document.getElementById("autorotate-toggle").addEventListener("change", (e) => {
+      controls.autoRotate = e.target.checked;
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      updateCameraAnim();
+      controls.update();
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    }
+    loadInitialState();
+    animate();
+  </script>
+</body>
+</html>
